@@ -36,7 +36,7 @@ anigo/
 │   └── internal/
 │       ├── domain/               # 【领域层】纯模型 + 接口（不依赖具体实现）
 │       │   ├── config.go         #   Config / Login / NotificationConfig
-│       │   ├── ani.go            #   Ani 订阅 / StandbyRss / Tmdb
+│       │   ├── ani.go            #   Ani 订阅 / StandbyRss
 │       │   ├── misc.go           #   Item / TorrentsInfo / 枚举
 │       │   ├── time.go           #   DateTime / Date 自定义 JSON 解析
 │       │   └── ports.go          #   ★ 所有端口接口定义（核心）
@@ -47,13 +47,12 @@ anigo/
 │       │   ├── ani_service.go    #   订阅增删改/列表分组
 │       │   ├── download_service.go#  下载主流程/缺集/摸鱼/完结
 │       │   ├── rss_service.go    #   RSS 聚合/过滤/剧集提取
-│       │   ├── metadata_service.go#  元数据编排（BGM/TMDB/番剧源）
+│       │   ├── metadata_service.go#  元数据编排（BGM/番剧源）
 │       │   └── notify_service.go #   通知分发
 │       ├── rss/                  #   纯函数：RSS XML 解析
 │       ├── rename/               #   纯函数：剧集识别 + 重命名模板
 │       ├── provider/             # 【适配器】外部服务
 │       │   ├── bgm/              #   Bangumi（评分/剧集/OAuth，OAuth 未接入 HTTP）
-│       │   ├── tmdb/             #   TMDB 元数据
 │       │   ├── garden/           #   animes.garden 番剧源（唯一番剧源）
 │       │   ├── ai/               #   AI 引擎（DeepSeek，OpenAI 兼容）
 │       │   └── notifier/         #   通知器（telegram/bark/serverchan/webhook/shell/system）
@@ -153,7 +152,7 @@ type CloudConfig struct {
 ### 5.3 元数据 provider 端口
 
 ```go
-// MetadataProvider 元数据源（BGM/TMDB）
+// MetadataProvider 元数据源（BGM）
 type MetadataProvider interface {
     Name() string
     Search(ctx, keyword string) ([]SearchResult, error)
@@ -265,7 +264,7 @@ type ItemFilter interface {
 | `AniService` | 订阅 CRUD、列表分组（按季/周/拼音排序）、批量启停、导入导出 |
 | `RssService` | 聚合主+备用 RSS → 粗筛 → AI 解析+筛选（集号/规则/简中）→ 每集选最优版本 → 重命名 |
 | `DownloadService` | 下载主循环：登录→遍历订阅→解析RSS→查重→调网盘→缺集/摸鱼/完结检测→通知 |
-| `MetadataService` | 元数据编排：BGM/TMDB/番剧源 的搜索、详情、订阅反解析、封面下载 |
+| `MetadataService` | 元数据编排：BGM/番剧源 的搜索、详情、订阅反解析、封面下载 |
 | `NotifyService` | 遍历 notifier 分发，应用模板 |
 
 每个 service 用**构造函数注入**依赖（store / cloud / provider / 其他 service），例如：
@@ -346,7 +345,7 @@ frontend/
 3. **M3 订阅**：AniService + RssService（RSS 抓取/过滤/剧集/重命名）+ listAni/addAni/previewAni ✅
 4. **M3.5 AI 引擎**：AI 解析+筛选端口（DeepSeek，OpenAI 兼容）✅
 5. **M4 下载**：CloudDriver 接口 + driver_115 + DownloadService + 后台任务 ✅
-6. **M5 元数据**：bgm/tmdb/animes.garden provider ✅（Mikan 未实现）
+6. **M5 元数据**：bgm/animes.garden provider ✅（Mikan 未实现）
 7. **M6 通知**：Notifier 接口 + Telegram/Bark/ServerChan/WebHook/Shell/System ✅
 8. **M7 前端**：React 骨架 + 首页/番剧源/设置/日志页面 ✅
 9. **M8 打磨**：日志/前端体验 ✅；鉴权 ⚠️ 未实现；e2e 集成测试 ✅

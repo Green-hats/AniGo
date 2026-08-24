@@ -34,11 +34,6 @@ func GetDownloadPath(cfg *domain.Config, ani *domain.Ani, resolve func(ani *doma
 	if releaseDate.IsZero() {
 		releaseDate = time.Now()
 	}
-	tmdbDate := releaseDate
-	if ani.Tmdb != nil && !ani.Tmdb.Date.Time().IsZero() {
-		tmdbDate = ani.Tmdb.Date.Time()
-	}
-	tmdbYear := tmdbDate.Year()
 	year := releaseDate.Year()
 	month := int(releaseDate.Month())
 	monthFormat := fmt.Sprintf("%02d", month)
@@ -68,7 +63,6 @@ func GetDownloadPath(cfg *domain.Config, ani *domain.Ani, resolve func(ani *doma
 		tmpl = strings.ReplaceAll(tmpl, "${quarterName}", quarterName)
 	}
 
-	tmpl = strings.ReplaceAll(tmpl, "${tmdbYear}", strconv.Itoa(tmdbYear))
 	tmpl = strings.ReplaceAll(tmpl, "${year}", strconv.Itoa(year))
 	tmpl = strings.ReplaceAll(tmpl, "${month}", strconv.Itoa(month))
 	tmpl = strings.ReplaceAll(tmpl, "${monthFormat}", monthFormat)
@@ -87,14 +81,8 @@ func GetDownloadPath(cfg *domain.Config, ani *domain.Ani, resolve func(ani *doma
 	}
 
 	tmpl = strings.ReplaceAll(tmpl, "${title}", ani.Title)
-	tmpl = strings.ReplaceAll(tmpl, "${themoviedbName}", ani.ThemoviedbName)
 	tmpl = strings.ReplaceAll(tmpl, "${subgroup}", ani.Subgroup)
 
-	tmdbId := ""
-	if ani.Tmdb != nil && ani.Tmdb.ID != 0 {
-		tmdbId = strconv.Itoa(ani.Tmdb.ID)
-	}
-	tmpl = strings.ReplaceAll(tmpl, "${tmdbid}", tmdbId)
 	tmpl = strings.ReplaceAll(tmpl, "${bgmId}", bgmID)
 	tmpl = strings.ReplaceAll(tmpl, "${jpTitle}", jpTitle)
 

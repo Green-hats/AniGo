@@ -8,16 +8,14 @@ import (
 	"github.com/greenhats/anigo/internal/domain"
 	"github.com/greenhats/anigo/internal/provider/bgm"
 	"github.com/greenhats/anigo/internal/provider/garden"
-	"github.com/greenhats/anigo/internal/provider/tmdb"
 )
 
-// MetadataService 聚合元数据 provider（BGM/TMDB/animes.garden），
+// MetadataService 聚合元数据 provider（BGM/animes.garden），
 // 提供订阅创建（RssToAni）、bgmId 解析、剧集标题等能力。
 type MetadataService struct {
-	cfg  *ConfigService
-	bgm  *bgm.BGM
-	tmdb *tmdb.TMDB
-	gr   *garden.Garden
+	cfg   *ConfigService
+	bgm   *bgm.BGM
+	gr    *garden.Garden
 	cache domain.Cache
 }
 
@@ -26,7 +24,6 @@ func NewMetadataService(cfg *ConfigService, cache domain.Cache) *MetadataService
 	return &MetadataService{
 		cfg:   cfg,
 		bgm:   bgm.New(cfg, cache),
-		tmdb:  tmdb.New(cfg, cache),
 		gr:    garden.New(cfg),
 		cache: cache,
 	}
@@ -34,9 +31,6 @@ func NewMetadataService(cfg *ConfigService, cache domain.Cache) *MetadataService
 
 // BGM 返回 BGM 客户端。
 func (s *MetadataService) BGM() *bgm.BGM { return s.bgm }
-
-// TMDB 返回 TMDB 客户端。
-func (s *MetadataService) TMDB() *tmdb.TMDB { return s.tmdb }
 
 // Garden 返回 animes.garden 客户端。
 func (s *MetadataService) Garden() *garden.Garden { return s.gr }
@@ -188,7 +182,7 @@ func (s *MetadataService) SaveCover(imageURL string) string {
 	if imageURL == "" {
 		return ""
 	}
-	b, err := s.TMDBFetcherGet(imageURL)
+	b, err := s.FetchImage(imageURL)
 	if err != nil {
 		return ""
 	}

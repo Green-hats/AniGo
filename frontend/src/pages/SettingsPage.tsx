@@ -310,7 +310,7 @@ export default function SettingsPage() {
               <Form.Item
                 label="全局通知模板"
                 name="notificationTemplate"
-                tooltip="支持 ${text} ${title} ${season} ${episode} ${score} ${subgroup} ${currentEpisodeNumber} ${totalEpisodeNumber} ${year} ${month} ${date} ${bgmUrl} ${tmdburl} ${emoji} ${action} 等；渠道未填模板时使用这里。"
+                tooltip="支持 ${text} ${title} ${season} ${episode} ${score} ${subgroup} ${currentEpisodeNumber} ${totalEpisodeNumber} ${year} ${month} ${date} ${bgmUrl} ${emoji} ${action} 等；渠道未填模板时使用这里。"
                 style={{ marginBottom: 16 }}
               >
                 <Input.TextArea rows={4} placeholder="默认：${emoji}${emoji}${emoji}&#10;事件类型: ${action}&#10;标题: ${title}&#10;...&#10;事件: ${text}&#10;${emoji}${emoji}${emoji}" />

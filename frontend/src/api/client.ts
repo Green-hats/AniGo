@@ -66,8 +66,6 @@ export const api = {
     request<import('../types').GardenWeek[]>('POST', '/api/gardenList'),
   gardenGroup: (subject: string) =>
     request<import('../types').GardenGroup[]>('POST', `/api/gardenGroup?subject=${subject}`),
-  getThemoviedbName: (title: string, ova: boolean) =>
-    request<{ themoviedbName: string; tmdb: any }>('POST', '/api/getThemoviedbName', { title, ova }),
 
   // 通知
   testNotification: (nc: import('../types').NotificationConfig) =>

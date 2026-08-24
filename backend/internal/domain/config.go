@@ -99,10 +99,6 @@ type NotificationConfig struct {
 // Config 是应用根配置，持久化为 config.v2.json。
 type Config struct {
 	MikanHost                      string                `json:"mikanHost"`
-	TmdbApi                        string                `json:"tmdbApi"`
-	TmdbApiKey                     string                `json:"tmdbApiKey"`
-	TmdbImage                       string                `json:"tmdbImage"`
-	TmdbAnime                       bool                  `json:"tmdbAnime"`
 	DownloadToolType               string                `json:"downloadToolType"`
 	DownloadRetry                  int                   `json:"downloadRetry"`
 	PikpakEmail                    string                `json:"pikpakEmail"`
@@ -117,7 +113,6 @@ type Config struct {
 	RssTimeout                     int                   `json:"rssTimeout"`
 	FileExist                      bool                  `json:"fileExist"`
 	Offset                         bool                  `json:"offset"`
-	TitleYear                      bool                  `json:"titleYear"`
 	AutoDisabled                   bool                  `json:"autoDisabled"`
 	Skip5                          bool                  `json:"skip5"`
 	StandbyRss                     bool                  `json:"standbyRss"`
@@ -137,11 +132,6 @@ type Config struct {
 	ImportExclude                  bool                  `json:"importExclude"`
 	EnabledExclude                 bool                  `json:"enabledExclude"`
 	BgmJpName                      bool                  `json:"bgmJpName"`
-	Tmdb                           bool                  `json:"tmdb"`
-	TmdbId                         bool                  `json:"tmdbId"`
-	TmdbIdPlexMode                 bool                  `json:"tmdbIdPlexMode"`
-	TmdbOriginalName               bool                  `json:"tmdbOriginalName"`
-	TmdbLanguage                   string                `json:"tmdbLanguage"`
 	IpWhitelist                    bool                  `json:"ipWhitelist"`
 	IpWhitelistStr                 string                `json:"ipWhitelistStr"`
 	Omit                           bool                  `json:"omit"`
@@ -155,7 +145,6 @@ type Config struct {
 	DownloadNew                    bool                  `json:"downloadNew"`
 	RenameTemplate                 string                `json:"renameTemplate"`
 	RenameDelYear                  bool                  `json:"renameDelYear"`
-	RenameDelTmdbId                bool                  `json:"renameDelTmdbId"`
 	VerifyLoginIp                  bool                  `json:"verifyLoginIp"`
 	NotificationTemplate           string                `json:"notificationTemplate"`
 	BgmImage                       string                `json:"bgmImage"`
@@ -221,8 +210,6 @@ const defaultNotificationTemplate = `${emoji}${emoji}${emoji}
 事件类型: ${action}
 标题: ${title}
 评分: ${score}
-TMDB: ${tmdburl}
-TMDB标题: ${themoviedbName}
 BGM: ${bgmUrl}
 季: ${season}
 集: ${episode}
@@ -236,8 +223,6 @@ ${emoji}${emoji}${emoji}`
 func DefaultConfig() *Config {
 	return &Config{
 		MikanHost:                   "https://mikanani.me",
-		TmdbApi:                     "https://api.themoviedb.org",
-		TmdbAnime:                   true,
 		DownloadToolType:            "115",
 		Pan115Cookie:                defaultPan115Cookie(),
 		DownloadRetry:               3,
@@ -247,7 +232,6 @@ func DefaultConfig() *Config {
 		Rename:                      true,
 		Rss:                         true,
 		RssTimeout:                  20,
-		TitleYear:                   true,
 		Skip5:                       true,
 		LogsMax:                     128,
 		ProcrastinatingMasterOnly:   true,
@@ -256,8 +240,6 @@ func DefaultConfig() *Config {
 		MultiLoginForbidden:         true,
 		LoginEffectiveHours:         3,
 		Exclude:                     []string{"720[Pp]", "\\d-\\d", "合集", "特别篇"},
-		Tmdb:                        true,
-		TmdbLanguage:                "zh-CN",
 		Omit:                        true,
 		CustomEpisodeGroupIndex:     2,
 		CustomEpisodeStr:            renameRegStr,

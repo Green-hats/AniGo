@@ -29,6 +29,6 @@ clean:
 test:
 	cd backend && go vet ./... && go test ./...
 
-# 端到端集成测试（需要真实外部服务：AI/115/BGM/TMDB/animes.garden）
+# 端到端集成测试（需要真实外部服务：AI/115/BGM/animes.garden）
 e2e:
 	bash scripts/e2e.sh

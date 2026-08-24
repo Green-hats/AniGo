@@ -82,21 +82,6 @@ func (s *Server) handleGardenGroup(c *gin.Context) {
 	ok(c, groups)
 }
 
-// handleThemoviedbName 获取 TMDB 标题命名。
-func (s *Server) handleThemoviedbName(c *gin.Context) {
-	var body domain.ThemoviedbDTO
-	if !readJSONOrFail(c, &body) {
-		return
-	}
-	t, err := s.meta.TMDB().GetByName(c.Request.Context(), body.Title, body.Ova)
-	if err != nil {
-		fail(c, "获取 TMDB 失败")
-		return
-	}
-	name := s.meta.TMDB().GetFinalName(t)
-	ok(c, &domain.ThemoviedbVO{ThemoviedbName: name, Tmdb: t})
-}
-
 // handleGetBgmTitle 返回 BGM 显示标题。
 func (s *Server) handleGetBgmTitle(c *gin.Context) {
 	var body struct {

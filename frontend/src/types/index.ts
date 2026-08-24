@@ -57,10 +57,6 @@ export interface NotificationConfig {
 
 export interface Config {
   mikanHost: string
-  tmdbApi: string
-  tmdbApiKey: string
-  tmdbImage: string
-  tmdbAnime: boolean
   downloadToolType: string
   downloadRetry: number
   pan115Cookie: string
@@ -73,7 +69,6 @@ export interface Config {
   rssTimeout: number
   fileExist: boolean
   offset: boolean
-  titleYear: boolean
   autoDisabled: boolean
   skip5: boolean
   standbyRss: boolean
@@ -93,11 +88,6 @@ export interface Config {
   importExclude: boolean
   enabledExclude: boolean
   bgmJpName: boolean
-  tmdb: boolean
-  tmdbId: boolean
-  tmdbIdPlexMode: boolean
-  tmdbOriginalName: boolean
-  tmdbLanguage: string
   ipWhitelist: boolean
   ipWhitelistStr: string
   omit: boolean
@@ -110,7 +100,6 @@ export interface Config {
   downloadNew: boolean
   renameTemplate: string
   renameDelYear: boolean
-  renameDelTmdbId: boolean
   notificationTemplate: string
   bgmImage: string
   customCss: string
@@ -179,12 +168,6 @@ export interface Ani {
   omit: boolean
   procrastinating: boolean
   globalExclude: boolean
-  tmdb?: {
-    id: number
-    name: string
-    date: string
-    tmdbGroupId: string
-  } | null
 }
 
 export interface WeekAni {

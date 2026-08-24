@@ -89,7 +89,6 @@ func (s *Server) register() {
 	r.POST("/api/rssToAni", s.handleRssToAni)
 	r.POST("/api/gardenList", s.handleGardenList)
 	r.POST("/api/gardenGroup", s.handleGardenGroup)
-	r.POST("/api/getThemoviedbName", s.handleThemoviedbName)
 	r.POST("/api/getBgmTitle", s.handleGetBgmTitle)
 
 	// 通知

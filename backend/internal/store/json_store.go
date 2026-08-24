@@ -138,9 +138,6 @@ func fillConfigDefaults(c, def *domain.Config, present map[string]bool) {
 	if !present["mikanHost"] {
 		c.MikanHost = def.MikanHost
 	}
-	if !present["tmdbApi"] {
-		c.TmdbApi = def.TmdbApi
-	}
 	if !present["downloadToolType"] {
 		c.DownloadToolType = def.DownloadToolType
 	}
@@ -165,9 +162,6 @@ func fillConfigDefaults(c, def *domain.Config, present map[string]bool) {
 	if !present["rssTimeout"] {
 		c.RssTimeout = def.RssTimeout
 	}
-	if !present["titleYear"] {
-		c.TitleYear = def.TitleYear
-	}
 	if !present["skip5"] {
 		c.Skip5 = def.Skip5
 	}
@@ -191,12 +185,6 @@ func fillConfigDefaults(c, def *domain.Config, present map[string]bool) {
 	}
 	if !present["exclude"] {
 		c.Exclude = def.Exclude
-	}
-	if !present["tmdb"] {
-		c.Tmdb = def.Tmdb
-	}
-	if !present["tmdbLanguage"] {
-		c.TmdbLanguage = def.TmdbLanguage
 	}
 	if !present["omit"] {
 		c.Omit = def.Omit

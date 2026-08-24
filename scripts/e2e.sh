@@ -52,7 +52,6 @@ check "aiPing" "ok" "$(curl -s --max-time 30 -X POST http://127.0.0.1:$PORT/api/
 echo "=== 5. 元数据 ==="
 check "searchBgm" "12" "$(curl -s --max-time 30 -X POST http://127.0.0.1:$PORT/api/searchBgm -H 'Content-Type: application/json' -d '{"text":"间谍过家家"}' | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["data"]))')"
 check "gardenList 周数" "7" "$(curl -s --max-time 30 -X POST http://127.0.0.1:$PORT/api/gardenList | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["data"]))')"
-check "TMDB 命名" "间谍过家家" "$(curl -s --max-time 30 -X POST http://127.0.0.1:$PORT/api/getThemoviedbName -H 'Content-Type: application/json' -d '{"title":"间谍过家家","ova":false}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["themoviedbName"].split(" (")[0])')"
 
 echo "=== 6. RSS 解析 + AI 剧集提取 ==="
 check "previewAni 条数>0" "1" "$(curl -s --max-time 60 -X POST http://127.0.0.1:$PORT/api/previewAni -H 'Content-Type: application/json' -d '{"title":"间谍过家家","season":1,"subgroup":"ANi","url":"https://api.animes.garden/feed.xml?subject=477825&fansub=ANi"}' | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(1 if len(d["items"])>0 else 0)')"

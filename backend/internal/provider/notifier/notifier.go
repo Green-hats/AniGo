@@ -59,18 +59,10 @@ func (n *Notifier) replaceBase(tmpl string, ani *domain.Ani, cfg *domain.Notific
 		tmpl = strings.ReplaceAll(tmpl, "${seasonFormat}", fmt.Sprintf("%02d", ani.Season))
 		tmpl = strings.ReplaceAll(tmpl, "${episode}", strconv.Itoa(ani.CurrentEpisodeNumber))
 		tmpl = strings.ReplaceAll(tmpl, "${episodeFormat}", fmt.Sprintf("%02d", ani.CurrentEpisodeNumber))
-		tmpl = strings.ReplaceAll(tmpl, "${themoviedbName}", ani.ThemoviedbName)
 		tmpl = strings.ReplaceAll(tmpl, "${score}", strconv.FormatFloat(ani.Score, 'f', -1, 64))
 		tmpl = strings.ReplaceAll(tmpl, "${subgroup}", ani.Subgroup)
 		tmpl = strings.ReplaceAll(tmpl, "${currentEpisodeNumber}", strconv.Itoa(ani.CurrentEpisodeNumber))
 		tmpl = strings.ReplaceAll(tmpl, "${totalEpisodeNumber}", strconv.Itoa(ani.TotalEpisodeNumber))
-		tmdbID, tmdbURLStr := "", ""
-		if ani.Tmdb != nil {
-			tmdbID = strconv.Itoa(ani.Tmdb.ID)
-			tmdbURLStr = tmdbURL(ani)
-		}
-		tmpl = strings.ReplaceAll(tmpl, "${tmdbid}", tmdbID)
-		tmpl = strings.ReplaceAll(tmpl, "${tmdburl}", tmdbURLStr)
 		if d := ani.ReleaseDate.Time(); !d.IsZero() {
 			tmpl = strings.ReplaceAll(tmpl, "${year}", strconv.Itoa(d.Year()))
 			tmpl = strings.ReplaceAll(tmpl, "${month}", strconv.Itoa(int(d.Month())))
@@ -84,18 +76,6 @@ func (n *Notifier) replaceBase(tmpl string, ani *domain.Ani, cfg *domain.Notific
 	tmpl = strings.ReplaceAll(tmpl, "${emoji}", emoji)
 	tmpl = strings.ReplaceAll(tmpl, "${action}", action)
 	return tmpl
-}
-
-// tmdbURL 返回 TMDB 详情页 URL（OVA/剧场版走 movie，其余走 tv）。
-func tmdbURL(ani *domain.Ani) string {
-	if ani.Tmdb == nil || ani.Tmdb.ID == 0 {
-		return ""
-	}
-	t := "tv"
-	if ani.Ova {
-		t = "movie"
-	}
-	return fmt.Sprintf("https://www.themoviedb.org/%s/%d", t, ani.Tmdb.ID)
 }
 
 // StatusMeta 返回状态对应的 emoji 与动作名。

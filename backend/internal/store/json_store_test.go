@@ -89,8 +89,8 @@ func TestLoadConfigFillsMissingFields(t *testing.T) {
 	if c.RssSleepMinutes != 30 {
 		t.Errorf("RssSleepMinutes = %d, want 30", c.RssSleepMinutes)
 	}
-	if c.TmdbApi != def.TmdbApi {
-		t.Errorf("缺失字段未填默认值: TmdbApi = %q, want %q", c.TmdbApi, def.TmdbApi)
+	if c.RssTimeout != def.RssTimeout {
+		t.Errorf("缺失字段未填默认值: RssTimeout = %d, want %d", c.RssTimeout, def.RssTimeout)
 	}
 	if c.Exclude == nil {
 		t.Error("Exclude 应为空切片而非 nil")

@@ -16,7 +16,6 @@ var (
 	regEp       = regexp.MustCompile(RegStr)
 	regNumber   = regexp.MustCompile(`\d+(\.5)?`)
 	regYear     = regexp.MustCompile(` ?\(((19|20)\d{2})\)`)
-	regTmdbId   = regexp.MustCompile(` ?(\[tmdbid=(\d+)]|\{tmdb-(\d+)})`)
 	regRes      = regexp.MustCompile(`(720|1080|2160)[Pp]`)
 	regHashTail = regexp.MustCompile(`\[([A-Z]|\d){8}]$`)
 )
@@ -91,10 +90,6 @@ func Rename(ani *domain.Ani, item *domain.Item, cfg *domain.Config) bool {
 
 	itemTitle = GetName(itemTitle)
 	resolution := GetResolution(itemTitle)
-	tmdbId := ""
-	if ani.Tmdb != nil && ani.Tmdb.ID != 0 {
-		tmdbId = strconv.Itoa(ani.Tmdb.ID)
-	}
 
 	subgroup := item.Subgroup
 	if strings.TrimSpace(subgroup) == "" {
@@ -109,9 +104,7 @@ func Rename(ani *domain.Ani, item *domain.Item, cfg *domain.Config) bool {
 	tmpl = strings.ReplaceAll(tmpl, "${subgroup}", subgroup)
 	tmpl = strings.ReplaceAll(tmpl, "${itemTitle}", itemTitle)
 	tmpl = strings.ReplaceAll(tmpl, "${resolution}", resolution)
-	tmpl = strings.ReplaceAll(tmpl, "${tmdbid}", tmdbId)
 	tmpl = strings.ReplaceAll(tmpl, "${title}", title)
-	tmpl = strings.ReplaceAll(tmpl, "${themoviedbName}", ani.ThemoviedbName)
 	tmpl = RenameDel(tmpl, cfg)
 
 	reName := GetName(tmpl)
@@ -153,10 +146,6 @@ func RenameWithEpisode(ani *domain.Ani, item *domain.Item, cfg *domain.Config, e
 
 	itemTitle := GetName(item.Title)
 	resolution := GetResolution(itemTitle)
-	tmdbId := ""
-	if ani.Tmdb != nil && ani.Tmdb.ID != 0 {
-		tmdbId = strconv.Itoa(ani.Tmdb.ID)
-	}
 	subgroup := item.Subgroup
 	if strings.TrimSpace(subgroup) == "" {
 		subgroup = "未知字幕组"
@@ -170,9 +159,7 @@ func RenameWithEpisode(ani *domain.Ani, item *domain.Item, cfg *domain.Config, e
 	tmpl = strings.ReplaceAll(tmpl, "${subgroup}", subgroup)
 	tmpl = strings.ReplaceAll(tmpl, "${itemTitle}", itemTitle)
 	tmpl = strings.ReplaceAll(tmpl, "${resolution}", resolution)
-	tmpl = strings.ReplaceAll(tmpl, "${tmdbid}", tmdbId)
 	tmpl = strings.ReplaceAll(tmpl, "${title}", title)
-	tmpl = strings.ReplaceAll(tmpl, "${themoviedbName}", ani.ThemoviedbName)
 	tmpl = RenameDel(tmpl, cfg)
 
 	reName := GetName(tmpl)
@@ -253,33 +240,15 @@ func GetName(s string) string {
 	return strings.TrimSpace(s)
 }
 
-// RenameDel 根据配置去除 tmdb id 与年份标记。
+// RenameDel 根据配置去除年份标记。
 func RenameDel(title string, cfg *domain.Config) string {
 	if strings.TrimSpace(title) == "" {
 		return ""
-	}
-	if cfg.RenameDelTmdbId {
-		title = regTmdbId.ReplaceAllString(title, "")
 	}
 	if cfg.RenameDelYear {
 		title = regYear.ReplaceAllString(title, "")
 	}
 	return strings.TrimSpace(title)
-}
-
-// RenameDelConfig 无论配置与否都去除 tmdb id 与年份标记
-// （用于 TMDB 显示名拼接等场景，isConfig=false 时强制去除）。
-func RenameDelConfig(title string, isConfig bool) string {
-	if strings.TrimSpace(title) == "" {
-		return ""
-	}
-	if !isConfig {
-		title = regTmdbId.ReplaceAllString(title, "")
-		title = regYear.ReplaceAllString(title, "")
-		return strings.TrimSpace(title)
-	}
-	cfg := &domain.Config{RenameDelTmdbId: true, RenameDelYear: true}
-	return RenameDel(title, cfg)
 }
 
 // GetSubgroup 从首条括号条目提取字幕组。

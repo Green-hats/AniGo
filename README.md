@@ -9,7 +9,7 @@
 | **云端追番** | RSS 自动离线下载到 115 网盘，本地零存储 |
 | **AI 解析** | DeepSeek 等大模型批量解析标题，提取集数/分辨率/字幕组（仅 AI 解析） |
 | **四源聚合** | animes.garden（動漫花園+蜜柑+萌番组+ANi 聚合）作番剧源 |
-| **元数据** | Bangumi 评分/季数/总集数、TMDB 标题命名、封面下载 |
+| **元数据** | Bangumi 评分/季数/总集数、封面下载 |
 | **通知** | Telegram / Bark / ServerChan / WebHook / Shell / 系统日志 |
 | **单二进制** | 前端 React 构建产物嵌入后端，一个 `anigo` 搞定 |
 | **多设备** | 服务器部署，任意设备浏览器访问管理 |
@@ -98,7 +98,7 @@ python scripts/qrcode_cookie_115.py android    # 指定登录设备类型（会�
 ```
 ${title} ${season} ${seasonFormat} ${episode} ${episodeFormat}
 ${letter} ${quarter} ${quarterName} ${year} ${month} ${monthFormat}
-${tmdbid} ${bgmId} ${jpTitle} ${themoviedbName} ${subgroup}
+${bgmId} ${jpTitle} ${subgroup}
 ```
 
 ### 通知
@@ -131,7 +131,7 @@ anigo/
 │       ├── domain/           # 领域模型 + 端口接口（ports.go）
 │       ├── store/            # JSON 文件持久化 + TTL 缓存
 │       ├── service/          # 业务服务（订阅/下载/通知/元数据）
-│       ├── provider/         # 适配器：bgm/tmdb/garden/ai/notifier
+│       ├── provider/         # 适配器：bgm/garden/ai/notifier
 │       ├── cloud/            # 网盘驱动（driver_115）
 │       ├── rss/ rename/      # 纯函数：RSS 解析/剧集提取/重命名
 │       ├── httpapi/          # Gin HTTP 层 + 嵌入前端

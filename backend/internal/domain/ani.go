@@ -25,53 +25,6 @@ type StandbyRss struct {
 	Offset int    `json:"offset"`
 }
 
-// Tmdb 镜像外部 Tmdb 实体字段。
-type Tmdb struct {
-	ID           int           `json:"id"`
-	Name         string        `json:"name"`
-	OriginalName string        `json:"originalName"`
-	Date         Date          `json:"date"`
-	TmdbGroupId  string        `json:"tmdbGroupId"`
-	PosterPath   string        `json:"posterPath"`
-	BackdropPath string        `json:"backdropPath"`
-	TmdbType     string        `json:"tmdbType"`
-	Overview     string        `json:"overview"`
-	VoteAverage  float64       `json:"voteAverage"`
-	VoteCount    int           `json:"voteCount"`
-	Tagline      string        `json:"tagline"`
-	Runtime      int           `json:"runtime"`
-	Genres       []TmdbGenre   `json:"genres"`
-	Networks     []TmdbNetwork `json:"networks"`
-	Videos       []TmdbVideo   `json:"videos"`
-	Cast         []TmdbCast    `json:"cast"`
-}
-
-// TmdbGenre 是一个简要的类型条目。
-type TmdbGenre struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-}
-
-// TmdbNetwork 是一个制作网络。
-type TmdbNetwork struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-}
-
-// TmdbVideo 是一个视频/预告片条目。
-type TmdbVideo struct {
-	Key  string `json:"key"`
-	Site string `json:"site"`
-	Name string `json:"name"`
-}
-
-// TmdbCast 是一个演员条目。
-type TmdbCast struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	Character string `json:"character"`
-}
-
 // Ani 是一个订阅，持久化为 ani.v2.json 的 JSON 数组。
 type Ani struct {
 	Sort                         int          `json:"sort"`
@@ -98,7 +51,6 @@ type Ani struct {
 	TotalEpisodeNumber           int          `json:"totalEpisodeNumber"`
 	BgmAiredEps                  int          `json:"bgmAiredEps"`
 	DownloadedEps                int          `json:"downloadedEps"`
-	ThemoviedbName               string       `json:"themoviedbName"`
 	Type                         string       `json:"type"`
 	BgmUrl                       string       `json:"bgmUrl"`
 	CustomDownloadPath           bool         `json:"customDownloadPath"`
@@ -112,7 +64,6 @@ type Ani struct {
 	NotDownload                  []float64    `json:"notDownload"`
 	Downloaded                   []float64    `json:"downloaded"`
 	DownloadedHash               []string     `json:"downloadedHash"`
-	Tmdb                         *Tmdb        `json:"tmdb"`
 	Procrastinating              bool         `json:"procrastinating"`
 	CustomRenameTemplateEnable   bool         `json:"customRenameTemplateEnable"`
 	CustomRenameTemplate         string       `json:"customRenameTemplate"`
@@ -138,10 +89,6 @@ func (a *Ani) Clone() *Ani {
 	c.DownloadedHash = append([]string(nil), a.DownloadedHash...)
 	c.CustomPriorityKeywords = append([]string(nil), a.CustomPriorityKeywords...)
 	c.CustomTags = append([]string(nil), a.CustomTags...)
-	if a.Tmdb != nil {
-		t := *a.Tmdb
-		c.Tmdb = &t
-	}
 	return &c
 }
 

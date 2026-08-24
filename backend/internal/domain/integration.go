@@ -206,16 +206,3 @@ type AnimeGardenFansub struct {
 	Name   string `json:"name"`
 	Avatar string `json:"avatar"`
 }
-
-// ThemoviedbDTO 是 getThemoviedbName 的输入。
-type ThemoviedbDTO struct {
-	TmdbId string `json:"tmdbId"`
-	Title  string `json:"title"`
-	Ova    bool   `json:"ova"`
-}
-
-// ThemoviedbVO 是 getThemoviedbName 的响应。
-type ThemoviedbVO struct {
-	ThemoviedbName string `json:"themoviedbName"`
-	Tmdb           *Tmdb  `json:"tmdb"`
-}

@@ -12,8 +12,8 @@ import (
 
 const minute = time.Minute
 
-// TMDBFetcherGet 下载图片字节（用普通 HTTP，不经过 BGM/TMDB fetcher）。
-func (s *MetadataService) TMDBFetcherGet(rawURL string) ([]byte, error) {
+// FetchImage 下载图片字节（用普通 HTTP 客户端）。
+func (s *MetadataService) FetchImage(rawURL string) ([]byte, error) {
 	return util.GetBytes(s.cfg.Get(), rawURL)
 }
 
