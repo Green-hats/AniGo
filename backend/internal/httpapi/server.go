@@ -88,6 +88,9 @@ func (s *Server) register() {
 
 	// 通知
 	r.POST("/api/testNotification", s.handleTestNotification)
+
+	// 前端静态资源（SPA 兜底）
+	r.NoRoute(staticFileServer())
 }
 
 func (s *Server) handlePing(c *gin.Context) {
