@@ -97,6 +97,7 @@ type Ani struct {
 	CurrentEpisodeNumber         int          `json:"currentEpisodeNumber"`
 	TotalEpisodeNumber           int          `json:"totalEpisodeNumber"`
 	BgmAiredEps                  int          `json:"bgmAiredEps"`
+	DownloadedEps                int          `json:"downloadedEps"`
 	ThemoviedbName               string       `json:"themoviedbName"`
 	Type                         string       `json:"type"`
 	BgmUrl                       string       `json:"bgmUrl"`

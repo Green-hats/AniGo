@@ -183,9 +183,10 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 	}
 
 	if sync {
+		ani.DownloadedEps = currentDownloadCount
 		ani.CurrentEpisodeNumber = s.rss.CurrentEpisodeNumber(ani, items)
 		ani.LastDownloadTime = domain.NowMillis()
-		s.logf("INFO", "download", "%s currentEp 更新为 %d", ani.Title, ani.CurrentEpisodeNumber)
+		s.logf("INFO", "download", "%s 已下载 %d 集, RSS 更新到 %d 集", ani.Title, currentDownloadCount, ani.CurrentEpisodeNumber)
 		if err := s.cfg.SaveAniList(s.cfg.AniList()); err != nil {
 			s.logf("ERROR", "download", "保存订阅失败: %v", err)
 		}

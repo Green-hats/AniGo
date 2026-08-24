@@ -160,6 +160,7 @@ export interface Ani {
   currentEpisodeNumber: number
   totalEpisodeNumber: number
   bgmAiredEps: number
+  downloadedEps: number
   score: number
   offset: number
   sort: number
