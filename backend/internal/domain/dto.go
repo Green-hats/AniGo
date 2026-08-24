@@ -20,3 +20,10 @@ type ImportAniDataDTO struct {
 	AniList  []*Ani `json:"aniList"`
 	Conflict string `json:"conflict"` // REPLACE | SKIP
 }
+
+// PlayItem 是某个订阅云端目录中的一个可播放文件。
+type PlayItem struct {
+	Episode  int    `json:"episode"`  // 从文件名提取的集号，0 表示未知
+	Filename string `json:"filename"`
+	PickCode string `json:"pickCode"` // 云端文件 pickcode（代理取流用）
+}

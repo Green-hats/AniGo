@@ -302,7 +302,12 @@ func (p *Pan115) FileURL(ctx context.Context, cfg *domain.Config, path string) (
 	if pc == "" {
 		return "", fmt.Errorf("云端文件不存在 %s", path)
 	}
-	rawURL := apiFileURL + "?pickcode=" + url.QueryEscape(pc) + "&method=get_file_url"
+	return p.FileURLByPickCode(ctx, cfg, pc)
+}
+
+// FileURLByPickCode 通过文件的 pickcode 直接返回可播放 URL。
+func (p *Pan115) FileURLByPickCode(ctx context.Context, cfg *domain.Config, pickcode string) (string, error) {
+	rawURL := apiFileURL + "?pickcode=" + url.QueryEscape(pickcode) + "&method=get_file_url"
 	m, err := p.reqFn(ctx, cfg, "GET", rawURL, nil)
 	if err != nil {
 		return "", err

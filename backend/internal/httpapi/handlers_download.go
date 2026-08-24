@@ -32,6 +32,25 @@ func (s *Server) handleDownloadStatus(c *gin.Context) {
 	ok(c, s.download.DownloadLoginStatus())
 }
 
+// handlePlayList 返回订阅在 115 云端目录下的可播放文件列表（用于前端播放弹窗）。
+func (s *Server) handlePlayList(c *gin.Context) {
+	var body domain.IdDTO
+	if !readJSONOrFail(c, &body) {
+		return
+	}
+	ani := s.ani.FindAniByID(body.ID)
+	if ani == nil {
+		fail(c, "订阅不存在")
+		return
+	}
+	items, err := s.download.PlayList(c.Request.Context(), ani)
+	if err != nil {
+		fail(c, err.Error())
+		return
+	}
+	ok(c, items)
+}
+
 // handleRefreshAll 触发一轮全部订阅刷新。
 func (s *Server) handleRefreshAll(c *gin.Context) {
 	go s.download.SyncDownload(s.cfg.AniList())

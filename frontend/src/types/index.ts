@@ -246,6 +246,12 @@ export interface LoginStatus {
   message: string
 }
 
+export interface PlayItem {
+  episode: number
+  filename: string
+  pickCode: string
+}
+
 export interface BgmInfo {
   id: string
   name: string

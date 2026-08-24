@@ -78,6 +78,8 @@ func (s *Server) register() {
 	r.POST("/api/downloadStatus", s.handleDownloadStatus)
 	r.POST("/api/refreshAll", s.handleRefreshAll)
 	r.POST("/api/deleteTorrent", s.handleDeleteTorrent)
+	r.POST("/api/playList", s.handlePlayList)
+	r.GET("/api/file", s.handleFileProxy)
 
 	// AI
 	r.POST("/api/aiPing", s.handleAIPing)

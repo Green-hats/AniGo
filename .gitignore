@@ -2,6 +2,10 @@
 backend/config/
 config/
 
+# 运行时在 backend 目录生成的配置（敏感：Cookie/AI Key）
+backend/config.v2.json
+backend/ani.v2.json
+
 # 构建产物
 backend/bin/
 backend/dist/

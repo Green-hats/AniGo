@@ -53,6 +53,8 @@ export const api = {
   downloadStatus: () => request<import('../types').LoginStatus>('POST', '/api/downloadStatus'),
   downloadLoginTest: (cookie?: string) =>
     request<null>('POST', '/api/downloadLoginTest', cookie ? { pan115Cookie: cookie } : {}),
+  playList: (id: string) =>
+    request<import('../types').PlayItem[]>('POST', '/api/playList', { id }),
 
   // AI
   aiPing: () => request<{ reply: string }>('POST', '/api/aiPing'),

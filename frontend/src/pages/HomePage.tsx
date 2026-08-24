@@ -1,18 +1,25 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Card, Collapse, Tag, Button, Space, Tooltip, Typography, message, Popconfirm } from 'antd'
+import { Card, Collapse, Tag, Button, Space, Tooltip, Typography, message, Popconfirm, Modal, List } from 'antd'
 import {
   DeleteOutlined,
   SyncOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons'
 import { api } from '../api/client'
-import type { Ani } from '../types'
+import type { Ani, PlayItem } from '../types'
 
 const { Text } = Typography
+
+// URL-safe base64（mpv-handler 协议要求）
+const b64u = (s: string) => btoa(s).replace(/\//g, '_').replace(/\+/g, '-').replace(/=/g, '')
 
 export default function HomePage() {
   const { data, refetch, isFetching } = useQuery({ queryKey: ['listAni'], queryFn: api.listAni })
   const [refreshing, setRefreshing] = useState<string | null>(null)
+  const [playAni, setPlayAni] = useState<Ani | null>(null)
+  const [playItems, setPlayItems] = useState<PlayItem[] | null>(null)
+  const [playLoading, setPlayLoading] = useState(false)
 
   const handleDelete = async (id: string) => {
     await api.deleteAni([id])
@@ -41,6 +48,30 @@ export default function HomePage() {
     message.success('已开始刷新全部')
     refetch()
   }
+
+  const handlePlay = async (ani: Ani) => {
+    setPlayAni(ani)
+    setPlayItems(null)
+    setPlayLoading(true)
+    try {
+      const items = await api.playList(ani.id)
+      setPlayItems(items)
+    } catch (e) {
+      message.error((e as Error).message)
+      setPlayAni(null)
+    } finally {
+      setPlayLoading(false)
+    }
+  }
+
+const buildMpvUrl = (item: PlayItem) => {
+    // 走本地代理转发（后端用 115 UA 拉流），mpv 只访问本地服务，规避 115 CDN 的 UA 绑定
+    // mpv-handler 协议要求：play/<b64url>/?参数  —— b64url 后必须有 "/"，参数才生效
+    const proxyUrl = `${window.location.origin}/api/file?pickcode=${encodeURIComponent(item.pickCode)}`
+    return `mpv-handler://play/${b64u(proxyUrl)}/?v_title=${b64u(item.filename)}`
+  }
+
+  const sortedPlayItems = playItems ? [...playItems].sort((a, b) => a.episode - b.episode || a.filename.localeCompare(b.filename)) : []
 
   return (
     <div>
@@ -85,6 +116,9 @@ export default function HomePage() {
                       </Text>
                     </div>
                     <Space>
+                      <Tooltip title="播放">
+                        <Button size="small" icon={<PlayCircleOutlined />} onClick={() => handlePlay(ani)} />
+                      </Tooltip>
                       <Tooltip title={ani.enable ? '停用' : '启用'}>
                         <Button size="small" onClick={() => handleToggle(ani)}>
                           {ani.enable ? '停用' : '启用'}
@@ -105,6 +139,37 @@ export default function HomePage() {
         }))}
       />
       )}
+      <Modal
+        title={playAni ? `${playAni.title} 选集播放` : '播放'}
+        open={!!playAni}
+        onCancel={() => setPlayAni(null)}
+        footer={null}
+        width={560}
+      >
+        {!playItems ? (
+          <div style={{ textAlign: 'center', padding: 24, color: '#999' }}>
+            {playLoading ? '正在获取云端文件…' : '无播放文件'}
+          </div>
+        ) : (
+          <List
+            size="small"
+            dataSource={sortedPlayItems}
+            renderItem={(item) => (
+              <List.Item
+                actions={[
+                  <a key="play" href={buildMpvUrl(item)} style={{ color: '#1677ff' }}>
+                    mpv 播放
+                  </a>,
+                ]}
+              >
+                <Text style={{ fontSize: 13 }}>
+                  {item.episode > 0 ? `第 ${item.episode} 集` : '未知集'} · {item.filename}
+                </Text>
+              </List.Item>
+            )}
+          />
+        )}
+      </Modal>
     </div>
   )
 }

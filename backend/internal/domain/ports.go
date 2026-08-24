@@ -77,6 +77,8 @@ type CloudDriver interface {
 	FileExists(ctx context.Context, cfg *Config, path string) (bool, error)
 	// FileURL 返回云端文件的可播放/下载 URL。
 	FileURL(ctx context.Context, cfg *Config, path string) (string, error)
+	// FileURLByPickCode 通过文件的 pickcode 直接返回可播放/下载 URL。
+	FileURLByPickCode(ctx context.Context, cfg *Config, pickcode string) (string, error)
 	// ListDir 列出云端目录的文件。
 	ListDir(ctx context.Context, cfg *Config, path string) ([]CloudFile, error)
 	// DeleteDir 递归删除云端目录。
