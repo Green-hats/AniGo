@@ -1,10 +1,24 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Card, Collapse, Tag, Button, Space, Tooltip, Typography, message, Popconfirm, Modal, List } from 'antd'
+import {
+  Card,
+  Collapse,
+  Tag,
+  Button,
+  Space,
+  Tooltip,
+  Typography,
+  message,
+  Popconfirm,
+  Modal,
+  Empty,
+  Skeleton,
+} from 'antd'
 import {
   DeleteOutlined,
   SyncOutlined,
   PlayCircleOutlined,
+  PlaySquareOutlined,
 } from '@ant-design/icons'
 import { api } from '../api/client'
 import type { Ani, PlayItem } from '../types'
@@ -140,34 +154,115 @@ const buildMpvUrl = (item: PlayItem) => {
       />
       )}
       <Modal
-        title={playAni ? `${playAni.title} 选集播放` : '播放'}
         open={!!playAni}
         onCancel={() => setPlayAni(null)}
         footer={null}
-        width={560}
+        width={620}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {playAni?.image ? (
+              <img
+                src={playAni.image}
+                alt=""
+                style={{ width: 40, height: 56, objectFit: 'cover', borderRadius: 6 }}
+              />
+            ) : (
+              <div style={{ width: 40, height: 56, background: '#f0f0f0', borderRadius: 6 }} />
+            )}
+            <div style={{ minWidth: 0 }}>
+              <Text strong style={{ fontSize: 16, display: 'block' }}>
+                {playAni?.title ?? ''}
+              </Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                选集播放 · 共 {sortedPlayItems.length} 集
+              </Text>
+            </div>
+          </div>
+        }
       >
         {!playItems ? (
-          <div style={{ textAlign: 'center', padding: 24, color: '#999' }}>
-            {playLoading ? '正在获取云端文件…' : '无播放文件'}
-          </div>
+          playLoading ? (
+            <div style={{ padding: 8 }}>
+              <Skeleton active paragraph={{ rows: 5 }} />
+            </div>
+          ) : (
+            <Empty description="无播放文件" />
+          )
+        ) : sortedPlayItems.length === 0 ? (
+          <Empty description="无播放文件" />
         ) : (
-          <List
-            size="small"
-            dataSource={sortedPlayItems}
-            renderItem={(item) => (
-              <List.Item
-                actions={[
-                  <a key="play" href={buildMpvUrl(item)} style={{ color: '#1677ff' }}>
-                    mpv 播放
-                  </a>,
-                ]}
+          <div
+            style={{
+              maxHeight: 420,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              paddingRight: 4,
+            }}
+          >
+            {sortedPlayItems.map((item) => (
+              <div
+                key={item.pickCode}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #f0f0f0',
+                  background: '#fff',
+                  transition: 'all 0.2s',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#1677ff'
+                  e.currentTarget.style.background = '#f5f9ff'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#f0f0f0'
+                  e.currentTarget.style.background = '#fff'
+                }}
               >
-                <Text style={{ fontSize: 13 }}>
-                  {item.episode > 0 ? `第 ${item.episode} 集` : '未知集'} · {item.filename}
-                </Text>
-              </List.Item>
-            )}
-          />
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    flexShrink: 0,
+                    borderRadius: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: item.episode > 0 ? '#1677ff' : '#999',
+                    background: item.episode > 0 ? '#e6f4ff' : '#f5f5f5',
+                  }}
+                >
+                  {item.episode > 0 ? item.episode : '?'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 13, display: 'block' }} ellipsis>
+                    {item.filename}
+                  </Text>
+                  {item.episode > 0 && (
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      第 {item.episode} 集
+                    </Text>
+                  )}
+                </div>
+                <a
+                  href={buildMpvUrl(item)}
+                  style={{ flexShrink: 0 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Button type="primary" size="small" icon={<PlaySquareOutlined />}>
+                    用 mpv 播放
+                  </Button>
+                </a>
+              </div>
+            ))}
+          </div>
         )}
       </Modal>
     </div>
