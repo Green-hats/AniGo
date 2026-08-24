@@ -1,0 +1,13 @@
+# 运行时生成的配置目录
+backend/config/
+
+# 构建产物
+backend/bin/
+backend/dist/
+
+# 前端依赖与构建产物
+frontend/node_modules/
+frontend/dist/
+
+# 测试临时文件
+/tmp/anigo-test
