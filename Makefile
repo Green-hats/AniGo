@@ -1,4 +1,4 @@
-.PHONY: ui build all dev clean test
+.PHONY: ui build all dev clean test e2e
 
 # 构建前端并拷贝到后端 embed 目录
 ui:
@@ -28,3 +28,7 @@ clean:
 
 test:
 	cd backend && go vet ./... && go test ./...
+
+# 端到端集成测试（需要真实外部服务：AI/115/BGM/TMDB/animes.garden）
+e2e:
+	bash scripts/e2e.sh
