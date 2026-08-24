@@ -219,6 +219,18 @@ func fillConfigDefaults(c, def *domain.Config, present map[string]bool) {
 	if !present["bgmApi"] {
 		c.BgmApi = def.BgmApi
 	}
+	if !present["aiEnabled"] {
+		c.AiEnabled = def.AiEnabled
+	}
+	if !present["aiProvider"] {
+		c.AiProvider = def.AiProvider
+	}
+	if !present["aiBaseURL"] {
+		c.AiBaseURL = def.AiBaseURL
+	}
+	if !present["aiModel"] {
+		c.AiModel = def.AiModel
+	}
 	// 列表始终序列化为 []（前端依赖 .length/.push）
 	if c.Exclude == nil {
 		c.Exclude = []string{}

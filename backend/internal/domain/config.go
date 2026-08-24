@@ -181,6 +181,12 @@ type Config struct {
 	BgmApi                         string                `json:"bgmApi"`
 	AllowCors                      bool                  `json:"allowCors"`
 	UUID                           string                `json:"uuid"`
+	// AI 设置：用云端大模型解析/过滤 RSS 标题
+	AiEnabled   bool   `json:"aiEnabled"`
+	AiProvider  string `json:"aiProvider"`
+	AiApiKey    string `json:"aiApiKey"`
+	AiBaseURL   string `json:"aiBaseURL"`
+	AiModel     string `json:"aiModel"`
 }
 
 // renameRegStr 是遗留的剧集提取正则，保留作为 customEpisodeStr 的默认值以兼容配置。
@@ -223,6 +229,10 @@ func DefaultConfig() *Config {
 		LimitLoginAttempts:          true,
 		ReverseProxyTrustIpList:     []string{"127.0.0.1"},
 		BgmApi:                      "https://api.bgm.tv",
+		AiEnabled:                   true,
+		AiProvider:                  "deepseek",
+		AiBaseURL:                   "https://api.deepseek.com",
+		AiModel:                     "deepseek-chat",
 	}
 }
 

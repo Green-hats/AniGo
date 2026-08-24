@@ -36,7 +36,7 @@ func main() {
 	aniService := service.NewAniService(cfgService, rssService)
 
 	// 3. HTTP 层
-	srv := httpapi.NewServer(cfgService, aniService)
+	srv := httpapi.NewServer(cfgService, aniService, rssService)
 
 	port := os.Getenv("PORT")
 	if port == "" {

@@ -11,21 +11,22 @@ import (
 	"github.com/greenhats/anigo/internal/domain"
 	"github.com/greenhats/anigo/internal/service"
 )
-
 // Server 是 Gin HTTP 应用服务。
 type Server struct {
 	engine *gin.Engine
 	cfg    *service.ConfigService
 	ani    *service.AniService
+	rss    *service.RssService
 }
 
 // NewServer 构建注册了所有路由的 Gin 引擎。
-func NewServer(cfg *service.ConfigService, ani *service.AniService) *Server {
+func NewServer(cfg *service.ConfigService, ani *service.AniService, rss *service.RssService) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	s := &Server{
 		engine: gin.New(),
 		cfg:    cfg,
 		ani:    ani,
+		rss:    rss,
 	}
 	s.register()
 	return s
@@ -61,6 +62,9 @@ func (s *Server) register() {
 	r.POST("/api/refreshAni", s.handleRefreshAni)
 	r.POST("/api/previewAni", s.handlePreviewAni)
 	r.POST("/api/downloadPath", s.handleDownloadPath)
+
+	// AI
+	r.POST("/api/aiPing", s.handleAIPing)
 }
 
 func (s *Server) handlePing(c *gin.Context) {
@@ -87,6 +91,7 @@ func (s *Server) handleSetConfig(c *gin.Context) {
 		fail(c, err.Error())
 		return
 	}
+	s.rss.ReloadAI()
 	okMsg(c, "修改成功")
 }
 
@@ -113,6 +118,16 @@ func (s *Server) handleCustomCss(c *gin.Context) {
 	c.Header("Content-Type", "text/css; charset=utf-8")
 	c.Header("Cache-Control", "no-store")
 	c.String(http.StatusOK, css)
+}
+
+// handleAIPing 测试 AI 连通性与密钥。
+func (s *Server) handleAIPing(c *gin.Context) {
+	reply, err := s.rss.AIPing(c.Request.Context())
+	if err != nil {
+		fail(c, err.Error())
+		return
+	}
+	ok(c, map[string]string{"reply": reply})
 }
 
 // handleExportConfig 下载配置备份 zip。

@@ -122,6 +122,74 @@ func Rename(ani *domain.Ani, item *domain.Item, cfg *domain.Config) bool {
 	return true
 }
 
+// RenameWithEpisode 用给定的集号渲染重命名模板（跳过正则提取）。
+// episode 由外部（如 AI 解析）提供。无法解析时返回 false。
+func RenameWithEpisode(ani *domain.Ani, item *domain.Item, cfg *domain.Config, episode float64) bool {
+	if ani.Ova {
+		item.ReName = RenameDel(titleOf(ani), cfg)
+		return true
+	}
+	if episode <= 0 {
+		return false
+	}
+	season := ani.Season
+	title := ani.Title
+	offset := ani.Offset
+	episode = episode + float64(offset)
+	item.Episode = episode
+
+	seasonFormat := fmt.Sprintf("%02d", season)
+	episodeFormat := fmt.Sprintf("%02d", int(episode))
+	episodeStrInt := strconv.Itoa(int(episode))
+
+	is5 := isHalf(episode)
+	if cfg.Skip5 && is5 {
+		return false
+	}
+	if is5 {
+		episodeFormat = episodeFormat + ".5"
+		episodeStrInt = episodeStrInt + ".5"
+	}
+
+	itemTitle := GetName(item.Title)
+	resolution := GetResolution(itemTitle)
+	tmdbId := ""
+	if ani.Tmdb != nil && ani.Tmdb.ID != 0 {
+		tmdbId = strconv.Itoa(ani.Tmdb.ID)
+	}
+	subgroup := item.Subgroup
+	if strings.TrimSpace(subgroup) == "" {
+		subgroup = "未知字幕组"
+	}
+
+	tmpl := GetRenameTemplate(ani, cfg)
+	tmpl = strings.ReplaceAll(tmpl, "${seasonFormat}", seasonFormat)
+	tmpl = strings.ReplaceAll(tmpl, "${episodeFormat}", episodeFormat)
+	tmpl = strings.ReplaceAll(tmpl, "${season}", strconv.Itoa(season))
+	tmpl = strings.ReplaceAll(tmpl, "${episode}", episodeStrInt)
+	tmpl = strings.ReplaceAll(tmpl, "${subgroup}", subgroup)
+	tmpl = strings.ReplaceAll(tmpl, "${itemTitle}", itemTitle)
+	tmpl = strings.ReplaceAll(tmpl, "${resolution}", resolution)
+	tmpl = strings.ReplaceAll(tmpl, "${tmdbid}", tmdbId)
+	tmpl = strings.ReplaceAll(tmpl, "${title}", title)
+	tmpl = strings.ReplaceAll(tmpl, "${themoviedbName}", ani.ThemoviedbName)
+	tmpl = RenameDel(tmpl, cfg)
+
+	reName := GetName(tmpl)
+	if cfg.MaxFileNameLength > 0 && len([]rune(reName)) > cfg.MaxFileNameLength {
+		reName = string([]rune(reName)[:cfg.MaxFileNameLength])
+	}
+	item.ReName = reName
+	return true
+}
+
+func titleOf(ani *domain.Ani) string {
+	if ani == nil {
+		return ""
+	}
+	return ani.Title
+}
+
 // GetRenameTemplate 解析订阅生效的重命名模板。
 func GetRenameTemplate(ani *domain.Ani, cfg *domain.Config) string {
 	tmpl := cfg.RenameTemplate
