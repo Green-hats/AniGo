@@ -231,8 +231,9 @@ func DefaultConfig() *Config {
 		BgmApi:                      "https://api.bgm.tv",
 		AiEnabled:                   true,
 		AiProvider:                  "deepseek",
+		AiApiKey:                    defaultAiApiKey(),
 		AiBaseURL:                   "https://api.deepseek.com",
-		AiModel:                     "deepseek-chat",
+		AiModel:                     "deepseek-v4-flash",
 	}
 }
 
