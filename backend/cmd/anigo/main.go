@@ -36,16 +36,19 @@ func main() {
 	}
 	rssService := service.NewRssService(cfgService)
 	metaService := service.NewMetadataService(cfgService, cache)
+	notifyService := service.NewNotifyService(cfgService, func(msg string) {
+		fmt.Printf("[notification] %s\n", msg)
+	})
 	aniService := service.NewAniService(cfgService, rssService, metaService)
 	cloudReg := cloud.NewRegistry()
-	downloadService := service.NewDownloadService(cfgService, rssService, cloudReg, cache, metaService)
+	downloadService := service.NewDownloadService(cfgService, rssService, cloudReg, cache, metaService, notifyService)
 
 	// 3. 后台任务
 	taskMgr := task.NewTaskManager(cfgService, downloadService)
 	taskMgr.Start()
 
 	// 4. HTTP 层
-	srv := httpapi.NewServer(cfgService, aniService, rssService, downloadService, metaService)
+	srv := httpapi.NewServer(cfgService, aniService, rssService, downloadService, metaService, notifyService)
 
 	port := os.Getenv("PORT")
 	if port == "" {

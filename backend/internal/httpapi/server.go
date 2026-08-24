@@ -19,10 +19,11 @@ type Server struct {
 	rss      *service.RssService
 	download *service.DownloadService
 	meta     *service.MetadataService
+	notify   *service.NotifyService
 }
 
 // NewServer 构建注册了所有路由的 Gin 引擎。
-func NewServer(cfg *service.ConfigService, ani *service.AniService, rss *service.RssService, download *service.DownloadService, meta *service.MetadataService) *Server {
+func NewServer(cfg *service.ConfigService, ani *service.AniService, rss *service.RssService, download *service.DownloadService, meta *service.MetadataService, notify *service.NotifyService) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	s := &Server{
 		engine:   gin.New(),
@@ -31,6 +32,7 @@ func NewServer(cfg *service.ConfigService, ani *service.AniService, rss *service
 		rss:      rss,
 		download: download,
 		meta:     meta,
+		notify:   notify,
 	}
 	s.register()
 	return s
@@ -83,6 +85,9 @@ func (s *Server) register() {
 	r.POST("/api/gardenGroup", s.handleGardenGroup)
 	r.POST("/api/getThemoviedbName", s.handleThemoviedbName)
 	r.POST("/api/getBgmTitle", s.handleGetBgmTitle)
+
+	// 通知
+	r.POST("/api/testNotification", s.handleTestNotification)
 }
 
 func (s *Server) handlePing(c *gin.Context) {

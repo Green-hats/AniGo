@@ -88,3 +88,18 @@ type LoginStatus struct {
 	OK         bool   `json:"loginOK"`
 	Message    string `json:"message"`
 }
+
+// Notification 是一条待发送的通知。
+type Notification struct {
+	Text   string
+	Status NotificationStatusEnum
+	Ani    *Ani
+}
+
+// Notifier 是通知渠道实现（Telegram/Bark/ServerChan/WebHook/Shell/System...）。
+type Notifier interface {
+	// Type 返回通知类型（对应 NotificationTypeEnum）。
+	Type() NotificationTypeEnum
+	// Send 发送一条通知。cfg 是该渠道的配置。
+	Send(ctx context.Context, cfg *NotificationConfig, n *Notification) error
+}

@@ -15,11 +15,12 @@ import (
 // DownloadService 是下载主循环：登录 → 遍历订阅 → 解析 RSS → 查重 →
 // 调网盘离线下载 → 缺集/摸鱼/完结检测。
 type DownloadService struct {
-	cfg   *ConfigService
-	rss   *RssService
-	cloud CloudProvider
-	cache domain.Cache
-	meta  *MetadataService
+	cfg    *ConfigService
+	rss    *RssService
+	cloud  CloudProvider
+	cache  domain.Cache
+	meta   *MetadataService
+	notify *NotifyService
 }
 
 // CloudProvider 是下载服务对网盘注册表的依赖接口，
@@ -38,8 +39,8 @@ var (
 var SeasonEpisodeRe = regSeasonEp
 
 // NewDownloadService 创建下载服务。
-func NewDownloadService(cfg *ConfigService, rss *RssService, cloud CloudProvider, cache domain.Cache, meta *MetadataService) *DownloadService {
-	return &DownloadService{cfg: cfg, rss: rss, cloud: cloud, cache: cache, meta: meta}
+func NewDownloadService(cfg *ConfigService, rss *RssService, cloud CloudProvider, cache domain.Cache, meta *MetadataService, notify *NotifyService) *DownloadService {
+	return &DownloadService{cfg: cfg, rss: rss, cloud: cloud, cache: cache, meta: meta, notify: notify}
 }
 
 // pathResolve 返回下载路径的 bgmId/jpTitle 解析回调。
@@ -167,6 +168,7 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 		}
 		s.cache.Put("hash:"+hash, reName, 24*time.Hour)
 		sync = true
+		s.notifySend(ani, reName, item.Master, domain.NotifyDownloadStart)
 	}
 
 	if sync {
@@ -184,7 +186,19 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 	if currentDownloadCount >= ani.TotalEpisodeNumber {
 		ani.Enable = false
 		_ = s.cfg.SaveAniList(s.cfg.AniList())
+		s.notifySend(ani, fmt.Sprintf("%s 订阅已完结", ani.Title), true, domain.NotifyCompleted)
 	}
+}
+
+// notifySend 发送下载相关通知（notify 未注入时静默跳过）。
+func (s *DownloadService) notifySend(ani *domain.Ani, text string, master bool, status domain.NotificationStatusEnum) {
+	if s.notify == nil {
+		return
+	}
+	if !master {
+		text = "(备用RSS) " + text
+	}
+	s.notify.Send(context.Background(), ani, text, status)
 }
 
 // RssOmit 通知缺失集数。
@@ -233,7 +247,7 @@ func (s *DownloadService) RssOmit(ani *domain.Ani, items []*domain.Item) {
 		sList = append(sList, msg)
 	}
 	if len(sList) > 0 {
-		fmt.Printf("[download] %s\n", strings.Join(sList, "\n"))
+		s.notifySend(ani, strings.Join(sList, "\n"), true, domain.NotifyOmit)
 	}
 }
 
@@ -271,7 +285,7 @@ func (s *DownloadService) RssProcrastinating(ani *domain.Ani, items []*domain.It
 		return
 	}
 	s.cache.Put(key, text, 24*time.Hour)
-	fmt.Printf("[download] %s\n", text)
+	s.notifySend(ani, text, true, domain.NotifyProcrastinating)
 }
 
 // containsFloat 判断浮点列表是否包含某值。
