@@ -16,14 +16,16 @@ import (
 type Server struct {
 	engine *gin.Engine
 	cfg    *service.ConfigService
+	ani    *service.AniService
 }
 
 // NewServer 构建注册了所有路由的 Gin 引擎。
-func NewServer(cfg *service.ConfigService) *Server {
+func NewServer(cfg *service.ConfigService, ani *service.AniService) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	s := &Server{
 		engine: gin.New(),
 		cfg:    cfg,
+		ani:    ani,
 	}
 	s.register()
 	return s
@@ -49,6 +51,16 @@ func (s *Server) register() {
 	r.POST("/api/clearCache", s.handleClearCache)
 	r.GET("/api/exportConfig", s.handleExportConfig)
 	r.POST("/api/importConfig", s.handleImportConfig)
+
+	// 订阅
+	r.POST("/api/listAni", s.handleListAni)
+	r.POST("/api/addAni", s.handleAddAni)
+	r.POST("/api/setAni", s.handleSetAni)
+	r.POST("/api/deleteAni", s.handleDeleteAni)
+	r.POST("/api/batchEnable", s.handleBatchEnable)
+	r.POST("/api/refreshAni", s.handleRefreshAni)
+	r.POST("/api/previewAni", s.handlePreviewAni)
+	r.POST("/api/downloadPath", s.handleDownloadPath)
 }
 
 func (s *Server) handlePing(c *gin.Context) {

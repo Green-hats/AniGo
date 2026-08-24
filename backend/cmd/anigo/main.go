@@ -32,9 +32,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "加载配置失败:", err)
 		os.Exit(1)
 	}
+	rssService := service.NewRssService(cfgService)
+	aniService := service.NewAniService(cfgService, rssService)
 
 	// 3. HTTP 层
-	srv := httpapi.NewServer(cfgService)
+	srv := httpapi.NewServer(cfgService, aniService)
 
 	port := os.Getenv("PORT")
 	if port == "" {
