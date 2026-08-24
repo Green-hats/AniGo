@@ -12,6 +12,7 @@ import (
 
 	"github.com/greenhats/anigo/internal/cloud"
 	"github.com/greenhats/anigo/internal/httpapi"
+	"github.com/greenhats/anigo/internal/log"
 	"github.com/greenhats/anigo/internal/service"
 	"github.com/greenhats/anigo/internal/store"
 	"github.com/greenhats/anigo/internal/task"
@@ -27,6 +28,8 @@ func main() {
 	// 1. 底层适配器
 	st := store.NewJSONStore(dir)
 	cache := store.NewTTLCache()
+	logger := log.New(256)
+	logService := service.NewLogService(logger)
 
 	// 2. 业务服务（构造器注入）
 	cfgService, err := service.NewConfigService(st, cache)
@@ -37,18 +40,18 @@ func main() {
 	rssService := service.NewRssService(cfgService)
 	metaService := service.NewMetadataService(cfgService, cache)
 	notifyService := service.NewNotifyService(cfgService, func(msg string) {
-		fmt.Printf("[notification] %s\n", msg)
+		logger.Info("notification", msg)
 	})
 	aniService := service.NewAniService(cfgService, rssService, metaService)
 	cloudReg := cloud.NewRegistry()
-	downloadService := service.NewDownloadService(cfgService, rssService, cloudReg, cache, metaService, notifyService)
+	downloadService := service.NewDownloadService(cfgService, rssService, cloudReg, cache, metaService, notifyService, logger)
 
 	// 3. 后台任务
-	taskMgr := task.NewTaskManager(cfgService, downloadService)
+	taskMgr := task.NewTaskManager(cfgService, downloadService, logger)
 	taskMgr.Start()
 
 	// 4. HTTP 层
-	srv := httpapi.NewServer(cfgService, aniService, rssService, downloadService, metaService, notifyService)
+	srv := httpapi.NewServer(cfgService, aniService, rssService, downloadService, metaService, notifyService, logService)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -60,9 +63,9 @@ func main() {
 	}
 
 	go func() {
-		fmt.Printf("ANI-RSS 服务已启动, 监听端口 %s, 配置目录 %s\n", port, dir)
+		logger.Info("main", fmt.Sprintf("ANI-RSS 服务已启动, 监听端口 %s, 配置目录 %s", port, dir))
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Fprintln(os.Stderr, "HTTP 服务启动失败:", err)
+			logger.Error("main", "HTTP 服务启动失败: "+err.Error())
 			os.Exit(1)
 		}
 	}()

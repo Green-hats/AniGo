@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/greenhats/anigo/internal/domain"
+	"github.com/greenhats/anigo/internal/log"
 	"github.com/greenhats/anigo/internal/rename"
 )
 
@@ -21,6 +22,7 @@ type DownloadService struct {
 	cache  domain.Cache
 	meta   *MetadataService
 	notify *NotifyService
+	logger *log.Logger
 }
 
 // CloudProvider 是下载服务对网盘注册表的依赖接口，
@@ -39,8 +41,8 @@ var (
 var SeasonEpisodeRe = regSeasonEp
 
 // NewDownloadService 创建下载服务。
-func NewDownloadService(cfg *ConfigService, rss *RssService, cloud CloudProvider, cache domain.Cache, meta *MetadataService, notify *NotifyService) *DownloadService {
-	return &DownloadService{cfg: cfg, rss: rss, cloud: cloud, cache: cache, meta: meta, notify: notify}
+func NewDownloadService(cfg *ConfigService, rss *RssService, cloud CloudProvider, cache domain.Cache, meta *MetadataService, notify *NotifyService, logger *log.Logger) *DownloadService {
+	return &DownloadService{cfg: cfg, rss: rss, cloud: cloud, cache: cache, meta: meta, notify: notify, logger: logger}
 }
 
 // pathResolve 返回下载路径的 bgmId/jpTitle 解析回调。
@@ -78,6 +80,7 @@ func (s *DownloadService) DownloadLoginStatus() domain.LoginStatus {
 // SyncDownload 运行一轮下载（遍历所有启用的订阅）。
 func (s *DownloadService) SyncDownload(list []*domain.Ani) {
 	if !s.Login(true) {
+		s.logf("WARN", "download", "下载客户端登录失败, 跳过本轮")
 		return
 	}
 	for _, ani := range list {
@@ -96,6 +99,7 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 
 	cfg := s.cfg.Get()
 	items := s.rss.GetItems(ani)
+	s.logf("INFO", "download", "%s 刷新完成, 共 %d 个条目", ani.Title, len(items))
 	s.RssOmit(ani, items)
 	s.RssProcrastinating(ani, items)
 
@@ -164,8 +168,10 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 
 		// 提交离线下载（异步，115 自行转存）
 		if err := driver.AddOfflineTask(context.Background(), cfg, item.Torrent, savePath+"/"+reName); err != nil {
+			s.logf("ERROR", "download", "%s 添加下载失败: %v", reName, err)
 			continue
 		}
+		s.logf("INFO", "download", "添加下载 %s → %s", reName, savePath)
 		s.cache.Put("hash:"+hash, reName, 24*time.Hour)
 		sync = true
 		s.notifySend(ani, reName, item.Master, domain.NotifyDownloadStart)
@@ -188,6 +194,14 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 		_ = s.cfg.SaveAniList(s.cfg.AniList())
 		s.notifySend(ani, fmt.Sprintf("%s 订阅已完结", ani.Title), true, domain.NotifyCompleted)
 	}
+}
+
+// logf 写入下载日志（logger 未注入时静默跳过）。
+func (s *DownloadService) logf(level, logger, format string, args ...interface{}) {
+	if s.logger == nil {
+		return
+	}
+	s.logger.Log(level, logger, fmt.Sprintf(format, args...))
 }
 
 // notifySend 发送下载相关通知（notify 未注入时静默跳过）。

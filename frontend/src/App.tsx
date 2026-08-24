@@ -4,6 +4,7 @@ import SideMenu from './components/SideMenu'
 import HomePage from './pages/HomePage'
 import GardenPage from './pages/GardenPage'
 import SettingsPage from './pages/SettingsPage'
+import LogsPage from './pages/LogsPage'
 
 const { Content } = Layout
 
@@ -19,6 +20,7 @@ export default function App() {
               <Route path="/home" element={<HomePage />} />
               <Route path="/garden" element={<GardenPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/logs" element={<LogsPage />} />
             </Routes>
           </Content>
         </Layout>

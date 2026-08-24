@@ -70,4 +70,8 @@ export const api = {
   // 通知
   testNotification: (nc: import('../types').NotificationConfig) =>
     request<null>('POST', '/api/testNotification', nc),
+
+  // 日志
+  getLogs: () => request<import('../types').LogEntry[]>('POST', '/api/logs'),
+  clearLogs: () => request<null>('POST', '/api/clearLogs'),
 }

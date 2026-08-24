@@ -2,10 +2,10 @@ package task
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
+	"github.com/greenhats/anigo/internal/log"
 	"github.com/greenhats/anigo/internal/service"
 )
 
@@ -14,6 +14,7 @@ import (
 type TaskManager struct {
 	cfg      *service.ConfigService
 	download *service.DownloadService
+	logger   *log.Logger
 	ctx      context.Context
 	cancel   context.CancelFunc
 	wg       sync.WaitGroup
@@ -22,8 +23,8 @@ type TaskManager struct {
 }
 
 // NewTaskManager 创建任务管理器。
-func NewTaskManager(cfg *service.ConfigService, download *service.DownloadService) *TaskManager {
-	return &TaskManager{cfg: cfg, download: download}
+func NewTaskManager(cfg *service.ConfigService, download *service.DownloadService, logger *log.Logger) *TaskManager {
+	return &TaskManager{cfg: cfg, download: download, logger: logger}
 }
 
 // Start 启动后台循环。
@@ -37,7 +38,9 @@ func (t *TaskManager) Start() {
 	t.ctx, t.cancel = context.WithCancel(context.Background())
 	t.wg.Add(1)
 	go t.runRSSLoop()
-	fmt.Println("[task] 后台任务已启动")
+	if t.logger != nil {
+		t.logger.Info("task", "后台任务已启动")
+	}
 }
 
 // Stop 停止所有后台循环并等待退出。
@@ -50,7 +53,9 @@ func (t *TaskManager) Stop() {
 	t.running = false
 	t.cancel()
 	t.wg.Wait()
-	fmt.Println("[task] 后台任务已停止")
+	if t.logger != nil {
+		t.logger.Info("task", "后台任务已停止")
+	}
 }
 
 // Restart 停止并重启（配置时间变化后调用）。

@@ -260,3 +260,10 @@ export interface RssToAniDTO {
   subgroup?: string
   enable?: boolean
 }
+
+export interface LogEntry {
+  message: string
+  level: string
+  loggerName: string
+  threadName: string
+}
