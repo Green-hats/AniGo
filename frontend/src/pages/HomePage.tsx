@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, Collapse, Tag, Button, Space, Tooltip, Typography, message, Popconfirm } from 'antd'
 import {
@@ -10,7 +11,8 @@ import type { Ani } from '../types'
 const { Text } = Typography
 
 export default function HomePage() {
-  const { data, refetch, isLoading } = useQuery({ queryKey: ['listAni'], queryFn: api.listAni })
+  const { data, refetch, isFetching } = useQuery({ queryKey: ['listAni'], queryFn: api.listAni })
+  const [refreshing, setRefreshing] = useState<string | null>(null)
 
   const handleDelete = async (id: string) => {
     await api.deleteAni([id])
@@ -19,8 +21,14 @@ export default function HomePage() {
   }
 
   const handleRefresh = async (id: string) => {
-    await api.refreshAni(id)
-    message.success('已开始刷新')
+    setRefreshing(id)
+    try {
+      await api.refreshAni(id)
+      message.success('已开始刷新')
+      refetch()
+    } finally {
+      setRefreshing(null)
+    }
   }
 
   const handleToggle = async (ani: Ani) => {
@@ -31,6 +39,7 @@ export default function HomePage() {
   const handleRefreshAll = async () => {
     await api.refreshAll()
     message.success('已开始刷新全部')
+    refetch()
   }
 
   return (
@@ -39,14 +48,15 @@ export default function HomePage() {
         <Typography.Title level={4} style={{ margin: 0 }}>
           我的订阅 ({data?.total ?? 0})
         </Typography.Title>
-        <Button icon={<SyncOutlined />} onClick={handleRefreshAll} loading={isLoading}>
+        <Button icon={<SyncOutlined />} onClick={handleRefreshAll} loading={isFetching}>
           刷新全部
         </Button>
       </div>
 
+      {!data ? null : (
       <Collapse
-        defaultActiveKey={data?.weekList?.map((_, i) => String(i))}
-        items={data?.weekList?.map((week, i) => ({
+        defaultActiveKey={data.weekList.map((_, i) => String(i))}
+        items={data.weekList.map((week, i) => ({
           key: String(i),
           label: `${week.weekLabel} (${week.items.length})`,
           children: (
@@ -81,7 +91,7 @@ export default function HomePage() {
                         </Button>
                       </Tooltip>
                       <Tooltip title="刷新">
-                        <Button size="small" icon={<SyncOutlined />} onClick={() => handleRefresh(ani.id)} />
+                        <Button size="small" icon={<SyncOutlined />} loading={refreshing === ani.id} onClick={() => handleRefresh(ani.id)} />
                       </Tooltip>
                       <Popconfirm title="删除该订阅？" onConfirm={() => handleDelete(ani.id)}>
                         <Button size="small" danger icon={<DeleteOutlined />} />
@@ -94,6 +104,7 @@ export default function HomePage() {
           ),
         }))}
       />
+      )}
     </div>
   )
 }

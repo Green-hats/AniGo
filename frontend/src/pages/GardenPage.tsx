@@ -53,9 +53,10 @@ export default function GardenPage() {
       <Typography.Title level={4} style={{ marginBottom: 16 }}>
         番剧源（animes.garden）
       </Typography.Title>
+      {!weeks ? null : (
       <Collapse
-        defaultActiveKey={weeks?.map((_, i) => String(i))}
-        items={weeks?.map((week, i) => ({
+        defaultActiveKey={weeks.map((_, i) => String(i))}
+        items={weeks.map((week, i) => ({
           key: String(i),
           label: `${week.weekLabel} (${week.subjects.length})`,
           children: (
@@ -70,6 +71,7 @@ export default function GardenPage() {
           ),
         }))}
       />
+      )}
 
       <Drawer
         title="选择字幕组"
