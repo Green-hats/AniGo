@@ -110,6 +110,8 @@ type Ani struct {
 	Omit                         bool         `json:"omit"`
 	DownloadNew                  bool         `json:"downloadNew"`
 	NotDownload                  []float64    `json:"notDownload"`
+	Downloaded                   []float64    `json:"downloaded"`
+	DownloadedHash               []string     `json:"downloadedHash"`
 	Tmdb                         *Tmdb        `json:"tmdb"`
 	Procrastinating              bool         `json:"procrastinating"`
 	CustomRenameTemplateEnable   bool         `json:"customRenameTemplateEnable"`
@@ -132,6 +134,8 @@ func (a *Ani) Clone() *Ani {
 	c.Match = append([]string(nil), a.Match...)
 	c.Exclude = append([]string(nil), a.Exclude...)
 	c.NotDownload = append([]float64(nil), a.NotDownload...)
+	c.Downloaded = append([]float64(nil), a.Downloaded...)
+	c.DownloadedHash = append([]string(nil), a.DownloadedHash...)
 	c.CustomPriorityKeywords = append([]string(nil), a.CustomPriorityKeywords...)
 	c.CustomTags = append([]string(nil), a.CustomTags...)
 	if a.Tmdb != nil {
@@ -156,6 +160,8 @@ func DefaultAni() *Ani {
 		Omit:                    true,
 		DownloadNew:             false,
 		NotDownload:             []float64{},
+		Downloaded:              []float64{},
+		DownloadedHash:          []string{},
 		Procrastinating:         true,
 		CustomRenameTemplate:    "[${subgroup}] ${title} S${seasonFormat}E${episodeFormat}",
 		Message:                 true,

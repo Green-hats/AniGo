@@ -103,7 +103,11 @@ func (p *Pan115) request(ctx context.Context, cfg *domain.Config, method, rawURL
 	}
 	var m map[string]interface{}
 	if err := json.Unmarshal(b, &m); err != nil {
-		return nil, fmt.Errorf("115 响应解析失败: %w", err)
+		preview := strings.TrimSpace(string(b))
+		if len(preview) > 200 {
+			preview = preview[:200]
+		}
+		return nil, fmt.Errorf("115 响应解析失败: %w (响应内容: %s)", err, preview)
 	}
 	// 115 业务错误通常带 errcode/error_msg 且 state=false
 	if state, ok := m["state"].(bool); ok && !state {

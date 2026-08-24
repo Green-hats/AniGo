@@ -79,8 +79,14 @@ func (s *DownloadService) DownloadLoginStatus() domain.LoginStatus {
 
 // SyncDownload 运行一轮下载（遍历所有启用的订阅）。
 func (s *DownloadService) SyncDownload(list []*domain.Ani) {
-	if !s.Login(true) {
-		s.logf("WARN", "download", "下载客户端登录失败, 跳过本轮")
+	cfg := s.cfg.Get()
+	if ok, _ := s.Driver().Login(context.Background(), true, cfg); !ok {
+		st := s.Driver().GetLoginStatus()
+		msg := st.Message
+		if msg == "" {
+			msg = "未知原因"
+		}
+		s.logf("WARN", "download", "下载客户端登录失败, 跳过本轮: %s", msg)
 		return
 	}
 	for _, ani := range list {
@@ -120,6 +126,22 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 		is5 := rename.Is5(episode)
 
 		if s.cache.Contains("hash:" + hash) {
+			if item.Master && !is5 {
+				currentDownloadCount++
+			}
+			continue
+		}
+
+		// 已下载过的资源（infoHash 持久化，重启后不重复提交）
+		if containsStr(ani.DownloadedHash, hash) {
+			if item.Master && !is5 {
+				currentDownloadCount++
+			}
+			continue
+		}
+
+		// 已下载过的集（持久化，重启后不重复下载）
+		if containsFloat(ani.Downloaded, episode) {
 			if item.Master && !is5 {
 				currentDownloadCount++
 			}
@@ -178,6 +200,8 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 		}
 		s.logf("INFO", "download", "添加下载 %s → %s", reName, savePath)
 		s.cache.Put("hash:"+hash, reName, 24*time.Hour)
+		ani.Downloaded = append(ani.Downloaded, episode)
+		ani.DownloadedHash = append(ani.DownloadedHash, hash)
 		sync = true
 		s.notifySend(ani, reName, item.Master, domain.NotifyDownloadStart)
 	}
