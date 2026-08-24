@@ -65,6 +65,82 @@ func TestPickBestPerEpisodePrefersMaster(t *testing.T) {
 	}
 }
 
+func TestPickBestPerEpisodePrefersEmbed(t *testing.T) {
+	items := []*domain.Item{
+		{Episode: 1, Resolution: "1080p", SubtitleEmbed: "内嵌", Subgroup: "ANi", Master: true},
+		{Episode: 1, Resolution: "1080p", SubtitleEmbed: "内封", Subgroup: "ANi", Master: true},
+	}
+	got := pickBestPerEpisode(items, "ANi")
+	if len(got) != 1 || got[0].SubtitleEmbed != "内封" {
+		t.Errorf("应选内封, got %+v", got[0])
+	}
+}
+
+func TestPickBestPerEpisodePrefersCodec(t *testing.T) {
+	items := []*domain.Item{
+		{Episode: 1, Resolution: "1080p", VideoCodec: "AVC", Subgroup: "ANi", Master: true},
+		{Episode: 1, Resolution: "1080p", VideoCodec: "HEVC", Subgroup: "ANi", Master: true},
+	}
+	got := pickBestPerEpisode(items, "ANi")
+	if len(got) != 1 || got[0].VideoCodec != "HEVC" {
+		t.Errorf("应选 HEVC, got %+v", got[0])
+	}
+}
+
+func TestPickBestPerEpisodePrefersSource(t *testing.T) {
+	items := []*domain.Item{
+		{Episode: 1, Resolution: "1080p", Source: "WebRip", Subgroup: "ANi", Master: true},
+		{Episode: 1, Resolution: "1080p", Source: "BDRip", Subgroup: "ANi", Master: true},
+	}
+	got := pickBestPerEpisode(items, "ANi")
+	if len(got) != 1 || got[0].Source != "BDRip" {
+		t.Errorf("应选 BDRip, got %+v", got[0])
+	}
+}
+
+func TestPickBestPerEpisodePrefersColorDepth(t *testing.T) {
+	items := []*domain.Item{
+		{Episode: 1, Resolution: "1080p", ColorDepth: "8bit", Subgroup: "ANi", Master: true},
+		{Episode: 1, Resolution: "1080p", ColorDepth: "10bit", Subgroup: "ANi", Master: true},
+	}
+	got := pickBestPerEpisode(items, "ANi")
+	if len(got) != 1 || got[0].ColorDepth != "10bit" {
+		t.Errorf("应选 10bit, got %+v", got[0])
+	}
+}
+
+func TestPickBestPerEpisodePrefersSubtitleLang(t *testing.T) {
+	items := []*domain.Item{
+		{Episode: 1, Resolution: "1080p", SubtitleLang: "简日", Subgroup: "ANi", Master: true},
+		{Episode: 1, Resolution: "1080p", SubtitleLang: "简繁日", Subgroup: "ANi", Master: true},
+	}
+	got := pickBestPerEpisode(items, "ANi")
+	if len(got) != 1 || got[0].SubtitleLang != "简繁日" {
+		t.Errorf("应选字幕更全的 简繁日, got %+v", got[0])
+	}
+}
+
+func TestPickBestPerEpisodeMissingSignalFallsBack(t *testing.T) {
+	// 内封但分辨率低，应选分辨率高者（分辨率优先级更高）
+	items := []*domain.Item{
+		{Episode: 1, Resolution: "720p", SubtitleEmbed: "内封", Subgroup: "ANi", Master: true},
+		{Episode: 1, Resolution: "1080p", SubtitleEmbed: "", Subgroup: "ANi", Master: true},
+	}
+	got := pickBestPerEpisode(items, "ANi")
+	if len(got) != 1 || got[0].Resolution != "1080p" {
+		t.Errorf("分辨率应优先, got %+v", got[0])
+	}
+	// 信号缺失（内封 vs 空）应选内封
+	items2 := []*domain.Item{
+		{Episode: 2, Resolution: "1080p", SubtitleEmbed: "", Subgroup: "ANi", Master: true},
+		{Episode: 2, Resolution: "1080p", SubtitleEmbed: "内嵌", Subgroup: "ANi", Master: true},
+	}
+	got2 := pickBestPerEpisode(items2, "ANi")
+	if len(got2) != 1 || got2[0].SubtitleEmbed != "内嵌" {
+		t.Errorf("缺失信号视为最低, 应选内嵌, got %+v", got2[0])
+	}
+}
+
 func TestCurrentEpisodeNumberDedup(t *testing.T) {
 	s := &RssService{cfg: &ConfigService{cfg: &domain.Config{}}}
 	// 模拟 12 集番剧，每集 2 个版本 → 24 个条目

@@ -117,6 +117,8 @@ ${tmdbid} ${bgmId} ${jpTitle} ${themoviedbName} ${subgroup}
 ⑥ 任意设备浏览器查看进度、管理订阅
 ```
 
+> 完整下载链路（RSS → AI 解析 → 过滤选版 → 查重 → 115 离线下载）见 [`docs/pipeline.md`](docs/pipeline.md)。
+
 ## 项目结构
 
 ```
@@ -136,7 +138,7 @@ anigo/
 ├── scripts/                  # 辅助脚本
 │   ├── e2e.sh                # 端到端集成测试
 │   └── qrcode_cookie_115.py  # 扫码获取 115 Cookie（第三方脚本）
-└── docs/                     # 架构设计文档
+└── docs/                     # 架构设计文档（含 pipeline.md 下载链路）
 ```
 
 ## 测试

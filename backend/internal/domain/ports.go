@@ -36,6 +36,13 @@ type ParsedTitle struct {
 	Subgroup   string  `json:"subgroup"`   // 字幕组
 	Title      string  `json:"title"`      // 去掉格式后的剧名
 	IsSpecial  bool    `json:"isSpecial"`  // 是否 x.5 特别篇
+
+	// 选版信号（同集多版本竞争时用于挑选最优版本；无法判断则为空）
+	SubtitleEmbed string `json:"subtitleEmbed"` // 字幕嵌入方式：内封 / 内嵌 / 外挂 / 空
+	VideoCodec    string `json:"videoCodec"`    // 视频编码：HEVC / x265 / AVC / x264 / 空
+	Source        string `json:"source"`        // 压制源：BD / BDRip / WebRip / Web / 空
+	ColorDepth    string `json:"colorDepth"`    // 色深：10bit / 8bit / 空
+	SubtitleLang  string `json:"subtitleLang"`  // 字幕语言：如 简繁日 / 简日 / 简 / 繁 / 空
 }
 
 // TitleParser 用 AI 批量解析 RSS 标题。

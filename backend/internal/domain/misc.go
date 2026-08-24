@@ -14,6 +14,13 @@ type Item struct {
 	Subgroup      string   `json:"subgroup"`
 	Resolution    string   `json:"resolution"`
 	PubDate       DateTime `json:"pubDate"`
+
+	// 选版信号（AI 解析，同集多版本竞争用）
+	SubtitleEmbed string `json:"subtitleEmbed"`
+	VideoCodec    string `json:"videoCodec"`
+	Source        string `json:"source"`
+	ColorDepth    string `json:"colorDepth"`
+	SubtitleLang  string `json:"subtitleLang"`
 }
 
 // Clone 返回 Item 的浅拷贝。

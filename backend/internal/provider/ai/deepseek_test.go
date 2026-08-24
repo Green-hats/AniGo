@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/greenhats/anigo/internal/domain"
@@ -49,6 +50,19 @@ func TestParseJSON(t *testing.T) {
 	if len(out3) != 2 || out3[0].RawTitle != "t1" || out3[1].RawTitle != "t2" {
 		t.Fatalf("padding fail: %+v", out3)
 	}
+
+	// 4. 解析选版信号字段（内封/内嵌、编码、压制源、色深、字幕语言）
+	d.completeFn = func(ctx context.Context, system, user string) (string, error) {
+		return `[{"rawTitle":"x","episode":4,"resolution":"1080P","subgroup":"北宇治字幕组","title":"与你相恋到生命尽头","isSpecial":false,"subtitleEmbed":"内封","videoCodec":"HEVC","source":"WebRip","colorDepth":"10bit","subtitleLang":"简繁日"}]`, nil
+	}
+	out4, err := d.Parse(context.Background(), []string{"[北宇治字幕组] 与你相恋到生命尽头 [04][WebRip][HEVC_AAC][简繁日内封]"})
+	if err != nil {
+		t.Fatalf("Parse signals err: %v", err)
+	}
+	p := out4[0]
+	if p.SubtitleEmbed != "内封" || p.VideoCodec != "HEVC" || p.Source != "WebRip" || p.ColorDepth != "10bit" || p.SubtitleLang != "简繁日" {
+		t.Fatalf("bad signals: %+v", p)
+	}
 }
 
 func TestTrimJSONFence(t *testing.T) {
@@ -78,5 +92,32 @@ func TestFilterBoolArray(t *testing.T) {
 	}
 	if len(flags) != 3 || flags[0] != true || flags[1] != false || flags[2] != true {
 		t.Fatalf("bad filter: %+v", flags)
+	}
+}
+
+// 简中字幕开关开启时，prompt 应包含简体中文字幕要求；关闭时不应包含。
+func TestFilterSubtitleSCPrompt(t *testing.T) {
+	var captured string
+
+	// 开启（默认）
+	d := NewDeepSeek(&domain.Config{AiApiKey: "test", AiModel: "deepseek-chat", AiSubtitleSC: true})
+	d.completeFn = func(ctx context.Context, system, user string) (string, error) {
+		captured = system
+		return `[true]`, nil
+	}
+	_, _ = d.Filter(context.Background(), &domain.Ani{Title: "T"}, []string{"x"})
+	if !strings.Contains(captured, "简体中文字幕") {
+		t.Errorf("开启简中开关时 prompt 应包含简中要求, got: %s", captured)
+	}
+
+	// 关闭
+	d2 := NewDeepSeek(&domain.Config{AiApiKey: "test", AiModel: "deepseek-chat", AiSubtitleSC: false})
+	d2.completeFn = func(ctx context.Context, system, user string) (string, error) {
+		captured = system
+		return `[true]`, nil
+	}
+	_, _ = d2.Filter(context.Background(), &domain.Ani{Title: "T"}, []string{"x"})
+	if strings.Contains(captured, "简体中文字幕") {
+		t.Errorf("关闭简中开关时 prompt 不应包含简中要求, got: %s", captured)
 	}
 }

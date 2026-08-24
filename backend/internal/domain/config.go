@@ -188,6 +188,8 @@ type Config struct {
 	AiBaseURL   string `json:"aiBaseURL"`
 	AiModel     string `json:"aiModel"`
 	AiPrompt    string `json:"aiPrompt"`
+	// AiSubtitleSC 是否仅保留含简体中文字幕的资源（简中或简中双语视为满足）。
+	AiSubtitleSC bool `json:"aiSubtitleSC"`
 }
 
 // renameRegStr 是遗留的剧集提取正则，保留作为 customEpisodeStr 的默认值以兼容配置。
@@ -196,14 +198,19 @@ const renameRegStr = `(.*|\[.*])(( - |Vol |[Ee][Pp]?)\d+(\.5)?( ?\(\d+\))?|【\d
 // RENAME_REG_STR 暴露剧集提取正则源码。
 func RENAME_REG_STR() string { return renameRegStr }
 
-// defaultAiPrompt 是 AI 标题解析的可编辑"要求"部分默认值。
+// defaultAiPrompt 是 AI 标题解析的内置固定规则（不允许用户修改）。
 // 由 provider 拼接到固定格式提示词的中间（输入输出格式不可变）。
 const defaultAiPrompt = `规则：
 1. 从标题中提取集数（episode）。可能是 "S01E03"、"第03话"、"03"、"Vol.3"、"EP3" 等格式，也可能是 "[03]" 或 "03" 的特别篇（如 3.5、06.5）。
 2. 提取分辨率（resolution）：1080P、720P、2160P 等；没有则返回 "none"。
 3. 提取字幕组（subgroup）：通常是标题开头的方括号内容，如 [ANi]、[喵萌奶茶屋]；没有则返回 ""。
 4. 提取剧名（title）：去掉字幕组、集数、分辨率、编码等信息后的纯剧名。
-5. 如果某个标题无法判断集数，episode 返回 0，isSpecial 返回 false。`
+5. 如果某个标题无法判断集数，episode 返回 0，isSpecial 返回 false。
+6. 提取字幕嵌入方式（subtitleEmbed）：内封（内封字幕/内封简繁）/内嵌（硬字幕/内嵌字幕）/外挂（外挂字幕）；没有明确标识返回 ""。
+7. 提取视频编码（videoCodec）：HEVC 或 x265、AVC 或 x264 等；没有返回 ""。
+8. 提取压制源（source）：BD、BDRip、WebRip、Web、TV、RAW 等；没有返回 ""。
+9. 提取色深（colorDepth）：10bit、8bit；没有返回 ""。
+10. 提取字幕语言（subtitleLang）：从标题里的字幕语言标记提取，如 简繁日、简日、简、繁、日、英；简中可写"简"，繁中可写"繁"；没有返回 ""。`
 
 // DEFAULT_AI_PROMPT 暴露默认 AI 要求。
 func DEFAULT_AI_PROMPT() string { return defaultAiPrompt }
@@ -249,6 +256,7 @@ func DefaultConfig() *Config {
 		AiBaseURL:                   "https://api.deepseek.com",
 		AiModel:                     "deepseek-v4-flash",
 		AiPrompt:                    defaultAiPrompt,
+		AiSubtitleSC:                true,
 	}
 }
 
