@@ -19,6 +19,7 @@ const { Text } = Typography
 export default function GardenPage() {
   const qc = useQueryClient()
   const [selected, setSelected] = useState<string | null>(null)
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null)
   const [subscribing, setSubscribing] = useState(false)
   const { data: weeks } = useQuery({ queryKey: ['gardenList'], queryFn: api.gardenList })
   const { data: groups, isLoading: groupsLoading } = useQuery({
@@ -74,7 +75,7 @@ export default function GardenPage() {
         title="选择字幕组"
         open={!!selected}
         onClose={() => setSelected(null)}
-        width={520}
+        width={620}
       >
         <List
           loading={groupsLoading}
@@ -82,6 +83,9 @@ export default function GardenPage() {
           renderItem={(g) => (
             <List.Item
               actions={[
+                <Button size="small" onClick={() => setSelectedGroup(g.id)}>
+                  查看资源
+                </Button>,
                 <Popconfirm title={`订阅 ${g.name} 的字幕组？`} onConfirm={() => handleSubscribe(g)}>
                   <Button type="primary" size="small" loading={subscribing}>
                     订阅
@@ -89,7 +93,30 @@ export default function GardenPage() {
                 </Popconfirm>,
               ]}
             >
-              <List.Item.Meta title={g.name} description={`${g.items?.length ?? 0} 条资源`} />
+              <List.Item.Meta
+                title={<a onClick={() => setSelectedGroup(g.id)}>{g.name}</a>}
+                description={`${g.items?.length ?? 0} 条资源`}
+              />
+            </List.Item>
+          )}
+        />
+      </Drawer>
+      {/* 字幕组详情：点击展开查看资源 */}
+      <Drawer
+        title={groups?.find((g) => g.id === selectedGroup)?.name ?? '资源列表'}
+        open={!!selectedGroup}
+        onClose={() => setSelectedGroup(null)}
+        width={680}
+      >
+        <List
+          loading={groupsLoading}
+          dataSource={groups?.find((g) => g.id === selectedGroup)?.items ?? []}
+          renderItem={(it) => (
+            <List.Item>
+              <List.Item.Meta
+                title={<Text style={{ fontSize: 13 }}>{it.title}</Text>}
+                description={`大小: ${it.formatSize ?? '未知'} · ${it.type ?? ''}`}
+              />
             </List.Item>
           )}
         />

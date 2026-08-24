@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/greenhats/anigo/internal/domain"
 	"github.com/greenhats/anigo/internal/util"
@@ -16,12 +17,17 @@ type AniService struct {
 	cfg  *ConfigService
 	rss  *RssService
 	meta *MetadataService
+	// onAdded 在订阅添加成功后触发（由 main 注入 DownloadService.DownloadAni）。
+	onAdded func(ani *domain.Ani)
 }
 
 // NewAniService 创建订阅服务。
 func NewAniService(cfg *ConfigService, rss *RssService, meta *MetadataService) *AniService {
 	return &AniService{cfg: cfg, rss: rss, meta: meta}
 }
+
+// SetOnAdded 注册订阅添加后的回调（异步触发一轮下载）。
+func (s *AniService) SetOnAdded(fn func(ani *domain.Ani)) { s.onAdded = fn }
 
 // pathResolve 返回下载路径的 bgmId/jpTitle 解析回调。
 func (s *AniService) pathResolve() func(ani *domain.Ani) (string, string) {
@@ -145,7 +151,22 @@ func (s *AniService) AddAni(ani *domain.Ani) error {
 		}
 	}
 	list = append(list, ani)
-	return s.cfg.SaveAniList(list)
+	if err := s.cfg.SaveAniList(list); err != nil {
+		return err
+	}
+	// 订阅后立即异步触发一轮下载（无需等后台轮询）
+	// 重新从内存列表查找真实指针传给下载，避免副本导致更新丢失
+	if s.onAdded != nil {
+		go func() {
+			time.Sleep(time.Second)
+			if real := s.FindAniByID(ani.ID); real != nil {
+				s.onAdded(real)
+			} else {
+				s.onAdded(ani)
+			}
+		}()
+	}
+	return nil
 }
 
 // SetAniRaw 更新订阅（部分合并，保留服务器管理字段）。

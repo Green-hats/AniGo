@@ -48,6 +48,8 @@ type aiNotConfiguredError struct{}
 func (e *aiNotConfiguredError) Error() string { return "AI 未配置 apiKey" }
 
 // GetItems 聚合主 + 备用 RSS 条目，按剧集排序。
+// 每集只保留一个最优版本：分辨率优先（2160p>1080p>720p），
+// 再优先订阅的字幕组，再优先主源（Master）。
 func (s *RssService) GetItems(ani *domain.Ani) []*domain.Item {
 	cfg := s.cfg.Get()
 	subgroup := ani.Subgroup
@@ -60,31 +62,76 @@ func (s *RssService) GetItems(ani *domain.Ani) []*domain.Item {
 		items = append(items, it)
 	}
 
-	if !cfg.StandbyRss {
-		sort.SliceStable(items, func(i, j int) bool { return items[i].Episode < items[j].Episode })
-		return items
+	if cfg.StandbyRss {
+		for _, sr := range ani.StandbyRssList {
+			time.Sleep(time.Second)
+			subgroup = sr.Label
+			if strings.TrimSpace(subgroup) == "" {
+				subgroup = "未知字幕组"
+			}
+			clone := ani.Clone()
+			clone.Offset = sr.Offset
+			for _, it := range getItems(cfg, s.ai, clone, sr.URL, subgroup) {
+				it.Master = false
+				items = append(items, it)
+			}
+		}
+		items = rss.DistinctItems(items, cfg.Coexist)
 	}
 
-	for _, sr := range ani.StandbyRssList {
-		time.Sleep(time.Second)
-		subgroup = sr.Label
-		if strings.TrimSpace(subgroup) == "" {
-			subgroup = "未知字幕组"
-		}
-		clone := ani.Clone()
-		clone.Offset = sr.Offset
-		for _, it := range getItems(cfg, s.ai, clone, sr.URL, subgroup) {
-			it.Master = false
-			items = append(items, it)
-		}
-	}
-
-	items = rss.DistinctItems(items, cfg.Coexist)
+	// 每集选一个最优版本
+	items = pickBestPerEpisode(items, ani.Subgroup)
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Episode < items[j].Episode })
 	return items
 }
 
-// CurrentEpisodeNumber 计算当前集数。
+// resolutionScore 将分辨率转为优先级（数值越大越优先）。
+func resolutionScore(res string) int {
+	switch strings.ToLower(strings.TrimSpace(res)) {
+	case "2160p", "4k":
+		return 3
+	case "1080p":
+		return 2
+	case "720p":
+		return 1
+	default:
+		return 0
+	}
+}
+
+// pickBestPerEpisode 按集分组，每集只保留一个最优条目。
+// 比较顺序：分辨率 > 是否匹配订阅字幕组 > 是否主源。
+func pickBestPerEpisode(items []*domain.Item, subscribedSubgroup string) []*domain.Item {
+	best := map[int]*domain.Item{}
+	// 保持稳定：遇到更优的才替换
+	better := func(cur, cand *domain.Item) bool {
+		cs := resolutionScore(cur.Resolution)
+		ds := resolutionScore(cand.Resolution)
+		if ds != cs {
+			return ds > cs
+		}
+		curSub := cur.Subgroup != "" && cur.Subgroup == subscribedSubgroup
+		candSub := cand.Subgroup != "" && cand.Subgroup == subscribedSubgroup
+		if candSub != curSub {
+			return candSub
+		}
+		return cand.Master && !cur.Master
+	}
+	for _, it := range items {
+		ep := int(it.Episode)
+		cur, ok := best[ep]
+		if !ok || better(cur, it) {
+			best[ep] = it
+		}
+	}
+	var out []*domain.Item
+	for _, it := range best {
+		out = append(out, it)
+	}
+	return out
+}
+
+// CurrentEpisodeNumber 计算当前集数（按集去重，修复多版本重复计数）。
 func (s *RssService) CurrentEpisodeNumber(ani *domain.Ani, items []*domain.Item) int {
 	cfg := s.cfg.Get()
 	if cfg.StandbyRss && cfg.Coexist {
@@ -96,25 +143,26 @@ func (s *RssService) CurrentEpisodeNumber(ani *domain.Ani, items []*domain.Item)
 		}
 		items = master
 	}
-	var cleaned []*domain.Item
+	// 按集去重计数
+	seen := map[int]bool{}
 	for _, it := range items {
 		if it.Episode == float64(int(it.Episode)) {
-			cleaned = append(cleaned, it)
+			seen[int(it.Episode)] = true
 		}
 	}
-	if len(cleaned) == 0 {
+	if len(seen) == 0 {
 		return 0
 	}
 	if ani.DownloadNew {
 		max := 0
-		for _, it := range cleaned {
-			if int(it.Episode) > max {
-				max = int(it.Episode)
+		for ep := range seen {
+			if ep > max {
+				max = ep
 			}
 		}
 		return max
 	}
-	return len(cleaned)
+	return len(seen)
 }
 
 // getItems 解析单个 RSS 源为条目（最新在前），过滤并重命名。
@@ -151,12 +199,41 @@ func getItems(cfg *domain.Config, aiclient *ai.DeepSeek, ani *domain.Ani, rssURL
 		clone := it.Clone()
 		clone.Title = pt.Title
 		clone.Subgroup = pt.Subgroup
+		clone.Resolution = pt.Resolution
 		if rename.RenameWithEpisode(ani, clone, cfg, pt.Episode) {
 			refined = append(refined, clone)
 		}
 	}
 	if len(refined) > 0 {
-		return refined
+		return filterByAI(cfg, aiclient, ani, refined)
 	}
 	return items
+}
+
+// filterByAI 用 AI 筛选器剔除不符合订阅规则的条目（尽力而为，失败不阻断）。
+func filterByAI(cfg *domain.Config, aiclient *ai.DeepSeek, ani *domain.Ani, items []*domain.Item) []*domain.Item {
+	// 无匹配/排除规则时无需 AI 筛选
+	if len(ani.Match) == 0 && len(ani.Exclude) == 0 {
+		return items
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	titles := make([]string, len(items))
+	for i, it := range items {
+		titles[i] = it.Title
+	}
+	keep, err := aiclient.Filter(ctx, ani, titles)
+	if err != nil {
+		return items // AI 筛选失败 → 全部保留
+	}
+	var out []*domain.Item
+	for i, it := range items {
+		if i < len(keep) && keep[i] {
+			out = append(out, it)
+		}
+	}
+	if len(out) == 0 {
+		return items // 避免全删，回退
+	}
+	return out
 }

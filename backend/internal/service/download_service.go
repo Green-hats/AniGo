@@ -96,6 +96,11 @@ func (s *DownloadService) SyncDownload(list []*domain.Ani) {
 func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 	downloadMutex <- struct{}{}
 	defer func() { <-downloadMutex }()
+	defer func() {
+		if r := recover(); r != nil {
+			s.logf("ERROR", "download", "DownloadAni panic: %v", r)
+		}
+	}()
 
 	cfg := s.cfg.Get()
 	items := s.rss.GetItems(ani)
@@ -180,7 +185,10 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 	if sync {
 		ani.CurrentEpisodeNumber = s.rss.CurrentEpisodeNumber(ani, items)
 		ani.LastDownloadTime = domain.NowMillis()
-		_ = s.cfg.SaveAniList(s.cfg.AniList())
+		s.logf("INFO", "download", "%s currentEp 更新为 %d", ani.Title, ani.CurrentEpisodeNumber)
+		if err := s.cfg.SaveAniList(s.cfg.AniList()); err != nil {
+			s.logf("ERROR", "download", "保存订阅失败: %v", err)
+		}
 	}
 
 	if !cfg.AutoDisabled {

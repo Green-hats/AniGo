@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/greenhats/anigo/internal/cloud"
+	"github.com/greenhats/anigo/internal/domain"
 	"github.com/greenhats/anigo/internal/httpapi"
 	"github.com/greenhats/anigo/internal/log"
 	"github.com/greenhats/anigo/internal/service"
@@ -45,6 +46,8 @@ func main() {
 	aniService := service.NewAniService(cfgService, rssService, metaService)
 	cloudReg := cloud.NewRegistry()
 	downloadService := service.NewDownloadService(cfgService, rssService, cloudReg, cache, metaService, notifyService, logger)
+	// 订阅添加成功后立即异步触发一轮下载
+	aniService.SetOnAdded(func(ani *domain.Ani) { downloadService.DownloadAni(ani) })
 	statusService := service.NewStatusService(cfgService, rssService, downloadService, cache)
 
 	// 3. 后台任务

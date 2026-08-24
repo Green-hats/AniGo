@@ -12,6 +12,7 @@ type Item struct {
 	HasDownloaded bool     `json:"hasDownloaded"`
 	Master        bool     `json:"master"`
 	Subgroup      string   `json:"subgroup"`
+	Resolution    string   `json:"resolution"`
 	PubDate       DateTime `json:"pubDate"`
 }
 
