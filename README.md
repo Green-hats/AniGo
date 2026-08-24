@@ -7,7 +7,7 @@
 | 能力 | 说明 |
 |---|---|
 | **云端追番** | RSS 自动离线下载到 115 网盘，本地零存储 |
-| **AI 解析** | DeepSeek 等大模型批量解析标题，提取集数/分辨率/字幕组，正则兜底 |
+| **AI 解析** | DeepSeek 等大模型批量解析标题，提取集数/分辨率/字幕组（仅 AI 解析） |
 | **四源聚合** | animes.garden（動漫花園+蜜柑+萌番组+ANi 聚合）作番剧源 |
 | **元数据** | Bangumi 评分/季数/总集数、TMDB 标题命名、封面下载 |
 | **通知** | Telegram / Bark / ServerChan / WebHook / Shell / 系统日志 |
@@ -70,9 +70,24 @@ make dev    # 后端 :7789 + Vite 热更新 :37789（/api 自动代理）
 
 ### 115 网盘下载
 
-1. 浏览器登录 [115 网盘](https://115.com)，复制 Cookie（`UID=...; CID=...; SEID=...; KID=...`）
+1. 获取 115 Cookie（`UID=...; CID=...; SEID=...; KID=...`），可用项目内置的扫码脚本（见下）
 2. 设置页 → 下载 → 填入 Cookie → 测试 115 登录
 3. 通过后开始云端离线下载，文件落盘在 115 网盘
+
+#### 扫码获取 115 Cookie 脚本
+
+`scripts/qrcode_cookie_115.py` 可通过扫码登录 115 并打印 Cookie，避免手动从浏览器复制：
+
+```bash
+pip install qrcode          # 需要 qrcode 库在终端输出二维码
+python scripts/qrcode_cookie_115.py            # 终端显示二维码，手机 115 扫码
+python scripts/qrcode_cookie_115.py -o         # 弹出二维码图片窗口扫码
+python scripts/qrcode_cookie_115.py android    # 指定登录设备类型（会踢掉同类型已登录设备）
+```
+
+脚本输出形如 `UID=...; CID=...; SEID=...; KID=...`，直接填入设置页即可。
+
+> 出处：[ChenyangGao/qrcode_cookie_115 · Gist](https://gist.github.com/ChenyangGao/d26a592a0aeb13465511c885d5c7ad61)
 
 ### 下载路径模板
 
@@ -118,7 +133,9 @@ anigo/
 │       ├── httpapi/          # Gin HTTP 层 + 嵌入前端
 │       └── task/             # 后台任务循环（RSS 轮询）
 ├── frontend/                 # 前端 React + TS + Ant Design
-├── scripts/e2e.sh            # 端到端集成测试
+├── scripts/                  # 辅助脚本
+│   ├── e2e.sh                # 端到端集成测试
+│   └── qrcode_cookie_115.py  # 扫码获取 115 Cookie（第三方脚本）
 └── docs/                     # 架构设计文档
 ```
 
