@@ -35,16 +35,17 @@ func main() {
 		os.Exit(1)
 	}
 	rssService := service.NewRssService(cfgService)
-	aniService := service.NewAniService(cfgService, rssService)
+	metaService := service.NewMetadataService(cfgService, cache)
+	aniService := service.NewAniService(cfgService, rssService, metaService)
 	cloudReg := cloud.NewRegistry()
-	downloadService := service.NewDownloadService(cfgService, rssService, cloudReg, cache)
+	downloadService := service.NewDownloadService(cfgService, rssService, cloudReg, cache, metaService)
 
 	// 3. 后台任务
 	taskMgr := task.NewTaskManager(cfgService, downloadService)
 	taskMgr.Start()
 
 	// 4. HTTP 层
-	srv := httpapi.NewServer(cfgService, aniService, rssService, downloadService)
+	srv := httpapi.NewServer(cfgService, aniService, rssService, downloadService, metaService)
 
 	port := os.Getenv("PORT")
 	if port == "" {

@@ -11,7 +11,8 @@ import (
 )
 
 // GetDownloadPath 解析订阅的下载路径模板。
-func GetDownloadPath(cfg *domain.Config, ani *domain.Ani) string {
+// resolve 可选：回调解析 bgmId/jpTitle（提供方如 MetadataService）。
+func GetDownloadPath(cfg *domain.Config, ani *domain.Ani, resolve func(ani *domain.Ani) (string, string)) string {
 	tmpl := cfg.DownloadPathTemplate
 	if ani.Ova && cfg.OvaDownloadPathTemplate != "" {
 		tmpl = cfg.OvaDownloadPathTemplate
@@ -76,6 +77,15 @@ func GetDownloadPath(cfg *domain.Config, ani *domain.Ani) string {
 	tmpl = strings.ReplaceAll(tmpl, "${season}", strconv.Itoa(season))
 	tmpl = strings.ReplaceAll(tmpl, "${seasonFormat}", fmt.Sprintf("%02d", season))
 
+	// bgmId / jpTitle 需要外部元数据，通过回调提供；未提供时保持空白
+	bgmID, jpTitle := "", ani.JpTitle
+	if resolve != nil {
+		bgmID, jpTitle = resolve(ani)
+		if jpTitle == "" {
+			jpTitle = ani.JpTitle
+		}
+	}
+
 	tmpl = strings.ReplaceAll(tmpl, "${title}", ani.Title)
 	tmpl = strings.ReplaceAll(tmpl, "${themoviedbName}", ani.ThemoviedbName)
 	tmpl = strings.ReplaceAll(tmpl, "${subgroup}", ani.Subgroup)
@@ -85,7 +95,8 @@ func GetDownloadPath(cfg *domain.Config, ani *domain.Ani) string {
 		tmdbId = strconv.Itoa(ani.Tmdb.ID)
 	}
 	tmpl = strings.ReplaceAll(tmpl, "${tmdbid}", tmdbId)
-	tmpl = strings.ReplaceAll(tmpl, "${jpTitle}", ani.JpTitle)
+	tmpl = strings.ReplaceAll(tmpl, "${bgmId}", bgmID)
+	tmpl = strings.ReplaceAll(tmpl, "${jpTitle}", jpTitle)
 
 	return cleanPath(tmpl)
 }

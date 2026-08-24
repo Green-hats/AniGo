@@ -267,6 +267,21 @@ func RenameDel(title string, cfg *domain.Config) string {
 	return strings.TrimSpace(title)
 }
 
+// RenameDelConfig 无论配置与否都去除 tmdb id 与年份标记
+// （用于 TMDB 显示名拼接等场景，isConfig=false 时强制去除）。
+func RenameDelConfig(title string, isConfig bool) string {
+	if strings.TrimSpace(title) == "" {
+		return ""
+	}
+	if !isConfig {
+		title = regTmdbId.ReplaceAllString(title, "")
+		title = regYear.ReplaceAllString(title, "")
+		return strings.TrimSpace(title)
+	}
+	cfg := &domain.Config{RenameDelTmdbId: true, RenameDelYear: true}
+	return RenameDel(title, cfg)
+}
+
 // GetSubgroup 从首条括号条目提取字幕组。
 func GetSubgroup(items []*domain.Item) string {
 	reg := regexp.MustCompile(`^\[(.+?)]`)

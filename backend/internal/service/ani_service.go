@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -12,13 +13,25 @@ import (
 
 // AniService 负责订阅的增删改、列表分组与预览。
 type AniService struct {
-	cfg *ConfigService
-	rss *RssService
+	cfg  *ConfigService
+	rss  *RssService
+	meta *MetadataService
 }
 
 // NewAniService 创建订阅服务。
-func NewAniService(cfg *ConfigService, rss *RssService) *AniService {
-	return &AniService{cfg: cfg, rss: rss}
+func NewAniService(cfg *ConfigService, rss *RssService, meta *MetadataService) *AniService {
+	return &AniService{cfg: cfg, rss: rss, meta: meta}
+}
+
+// pathResolve 返回下载路径的 bgmId/jpTitle 解析回调。
+func (s *AniService) pathResolve() func(ani *domain.Ani) (string, string) {
+	if s.meta == nil {
+		return nil
+	}
+	return func(ani *domain.Ani) (string, string) {
+		ctx := context.Background()
+		return s.meta.BgmSubjectId(ctx, ani), ani.JpTitle
+	}
 }
 
 // ListAni 返回分组的订阅列表。
@@ -272,7 +285,7 @@ func (s *AniService) BatchEnable(ids []string, value bool) {
 // PreviewAni 返回下载路径与条目（供 UI 预览）。
 func (s *AniService) PreviewAni(ani *domain.Ani) map[string]interface{} {
 	items := s.rss.GetItems(ani)
-	savePath := GetDownloadPath(s.cfg.Get(), ani)
+	savePath := GetDownloadPath(s.cfg.Get(), ani, s.pathResolve())
 	omitItems := []int{}
 	preview := []*domain.Item{}
 	for _, it := range items {
@@ -289,7 +302,7 @@ func (s *AniService) PreviewAni(ani *domain.Ani) map[string]interface{} {
 // DownloadPathPreview 返回订阅解析出的下载路径。
 func (s *AniService) DownloadPathPreview(ani *domain.Ani) map[string]interface{} {
 	return map[string]interface{}{
-		"downloadPath": GetDownloadPath(s.cfg.Get(), ani),
+		"downloadPath": GetDownloadPath(s.cfg.Get(), ani, s.pathResolve()),
 	}
 }
 

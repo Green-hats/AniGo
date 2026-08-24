@@ -15,10 +15,11 @@ import (
 // DownloadService 是下载主循环：登录 → 遍历订阅 → 解析 RSS → 查重 →
 // 调网盘离线下载 → 缺集/摸鱼/完结检测。
 type DownloadService struct {
-	cfg    *ConfigService
-	rss    *RssService
-	cloud  CloudProvider
-	cache  domain.Cache
+	cfg   *ConfigService
+	rss   *RssService
+	cloud CloudProvider
+	cache domain.Cache
+	meta  *MetadataService
 }
 
 // CloudProvider 是下载服务对网盘注册表的依赖接口，
@@ -37,8 +38,18 @@ var (
 var SeasonEpisodeRe = regSeasonEp
 
 // NewDownloadService 创建下载服务。
-func NewDownloadService(cfg *ConfigService, rss *RssService, cloud CloudProvider, cache domain.Cache) *DownloadService {
-	return &DownloadService{cfg: cfg, rss: rss, cloud: cloud, cache: cache}
+func NewDownloadService(cfg *ConfigService, rss *RssService, cloud CloudProvider, cache domain.Cache, meta *MetadataService) *DownloadService {
+	return &DownloadService{cfg: cfg, rss: rss, cloud: cloud, cache: cache, meta: meta}
+}
+
+// pathResolve 返回下载路径的 bgmId/jpTitle 解析回调。
+func (s *DownloadService) pathResolve() func(ani *domain.Ani) (string, string) {
+	if s.meta == nil {
+		return nil
+	}
+	return func(ani *domain.Ani) (string, string) {
+		return s.meta.BgmSubjectId(context.Background(), ani), ani.JpTitle
+	}
 }
 
 // Driver 返回当前网盘驱动。
@@ -87,7 +98,7 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 	s.RssOmit(ani, items)
 	s.RssProcrastinating(ani, items)
 
-	savePath := GetDownloadPath(cfg, ani)
+	savePath := GetDownloadPath(cfg, ani, s.pathResolve())
 	driver := s.Driver()
 	sync := false
 	currentDownloadCount := 0
