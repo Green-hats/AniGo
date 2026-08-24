@@ -52,7 +52,7 @@ anigo/
 │       ├── rss/                  #   纯函数：RSS XML 解析
 │       ├── rename/               #   纯函数：剧集识别 + 重命名模板
 │       ├── provider/             # 【适配器】外部服务
-│       │   ├── bgm/              #   Bangumi（评分/剧集/OAuth，OAuth 未接入 HTTP）
+│       │   ├── bgm/              #   Bangumi（搜索/剧集/评分/封面）
 │       │   ├── garden/           #   animes.garden 番剧源（唯一番剧源）
 │       │   ├── ai/               #   AI 引擎（DeepSeek，OpenAI 兼容）
 │       │   └── notifier/         #   通知器（telegram/bark/serverchan/webhook/shell/system）
@@ -176,10 +176,10 @@ type FansubSource interface {
   - `GET /resources` — 资源搜索（include/exclude/keywords/fansub/type 过滤）
   - `GET /subjects` — 番剧周列表（首页番剧源浏览）
   - `GET /detail/{provider}/{id}` — 资源详情
-- 已实现：`provider/garden` 提供 `ListSubjects` / `Group` / `BuildRSS` / `GetSubjectIdFromURL`
+- 已实现：`provider/garden` 提供 `ListSubjects` / `Group` / `GetSubjectIdFromURL`
 - ~~备选源 Mikan / ani-bt~~（未实现）
 
-BGM 特有能力（评分/剧集标题）直接调用 `provider/bgm`；OAuth 代码在 provider 中实现但**未接入 HTTP 层**（未实现）。
+BGM 提供搜索/剧集/评分元数据；评分与 OAuth 相关能力未接入，已从代码中移除。
 
 ### 5.4 通知端口
 

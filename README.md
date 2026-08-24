@@ -7,8 +7,10 @@
 | 能力 | 说明 |
 |---|---|
 | **云端追番** | RSS 自动离线下载到 115 网盘，本地零存储 |
-| **AI 解析** | DeepSeek 等大模型批量解析标题，提取集数/分辨率/字幕组（仅 AI 解析） |
+| **AI 解析** | DeepSeek 等大模型批量解析标题，提取集数/分辨率/字幕组/选版信号，同步完成规则与简中字幕筛选 |
+| **智能选版** | 同集多版本自动择优（分辨率 > 压制源 > 编码 > 色深 > 字幕嵌入/语言），每集不重复下载 |
 | **四源聚合** | animes.garden（動漫花園+蜜柑+萌番组+ANi 聚合）作番剧源 |
+| **在线播放** | 首页直接调用系统播放器（mpv 等）经本地代理播放 115 云端文件，无需下载 |
 | **元数据** | Bangumi 评分/季数/总集数、封面下载 |
 | **通知** | Telegram / Bark / ServerChan / WebHook / Shell / 系统日志 |
 | **单二进制** | 前端 React 构建产物嵌入后端，一个 `anigo` 搞定 |
@@ -18,7 +20,9 @@
 
 ### 环境要求
 - Go 1.26+（构建）
-- Node.js 20+（构建前端，可选——可跳过用预置产物）
+- Node.js 20+（构建前端，`make all` 会先构建前端再嵌入）
+
+> 前端构建产物（`frontend/dist` 与嵌入用的 `backend/internal/httpapi/static`）在 `.gitignore` 中，clone 后需先 `make all` 构建，否则后端启动时没有嵌入前端页面。
 
 ### 构建
 
@@ -117,9 +121,18 @@ ${bgmId} ${jpTitle} ${subgroup}
 ④ 查重后自动提交 115 离线下载
 ⑤ 缺集/摸鱼/完结自动检测 → 通知推送
 ⑥ 任意设备浏览器查看进度、管理订阅
+⑦ 首页点击播放 → 调用系统播放器在线观看云端已下载文件
 ```
 
 > 完整下载链路（RSS → AI 解析 → 过滤选版 → 查重 → 115 离线下载）见 [`docs/pipeline.md`](docs/pipeline.md)。
+
+### 在线播放（可选）
+
+首页订阅卡片点击播放图标，通过 `mpv-handler://` 协议拉起系统播放器（mpv 等）观看 115 云端文件：
+
+1. 安装 [mpv-handler](https://github.com/akiirui/mpv-handler) 并注册 `mpv-handler://` 协议
+2. 前端通过本地 `/api/file` 代理转发 115 CDN 流（自动带 115 UA 取流），播放器只访问本地端点，不暴露云端地址
+3. 播放列表有 30 秒短缓存，避免频繁遍历 115 目录
 
 ## 项目结构
 
@@ -130,27 +143,35 @@ anigo/
 │   └── internal/
 │       ├── domain/           # 领域模型 + 端口接口（ports.go）
 │       ├── store/            # JSON 文件持久化 + TTL 缓存
-│       ├── service/          # 业务服务（订阅/下载/通知/元数据）
+│       ├── service/          # 业务服务（订阅/下载/通知/元数据/状态）
 │       ├── provider/         # 适配器：bgm/garden/ai/notifier
 │       ├── cloud/            # 网盘驱动（driver_115）
 │       ├── rss/ rename/      # 纯函数：RSS 解析/剧集提取/重命名
 │       ├── httpapi/          # Gin HTTP 层 + 嵌入前端
 │       └── task/             # 后台任务循环（RSS 轮询）
 ├── frontend/                 # 前端 React + TS + Ant Design
+│   ├── src/pages/            # 首页/番剧源/设置/日志页面
+│   └── src/**/*.test.tsx     # vitest 组件与 API 测试
 ├── scripts/                  # 辅助脚本
 │   ├── e2e.sh                # 端到端集成测试
 │   └── qrcode_cookie_115.py  # 扫码获取 115 Cookie（第三方脚本）
-└── docs/                     # 架构设计文档（含 pipeline.md 下载链路）
+├── docs/                     # 架构设计文档（architecture.md / pipeline.md）
+├── Makefile                  # 构建/开发/测试统一入口
+└── go.work                   # Go workspace（backend 模块）
 ```
 
 ## 测试
 
 ```bash
-make test   # 单元测试 + vet
-make e2e    # 端到端集成测试（需真实外部服务）
+make test                      # 后端：go vet ./... && go test ./...
+cd frontend && npm run test    # 前端：vitest（组件/API）
+make e2e                       # 端到端集成测试（需真实外部服务：AI/115/BGM/animes.garden）
 ```
 
-E2E 覆盖：基础 API / 前端 / 配置 / AI / 元数据 / RSS 解析 / 订阅管理 / 115 登录 / 通知 / 导出导入 / 删除。
+覆盖范围：
+- **后端单元测试**：store（JSON 持久化/默认值/TTL 缓存）、util（格式化/拼音）、domain（时间/ID 序列化）、rename（集号/重命名模板）、rss、service、provider（AI/BGM/notifier/115/base）
+- **前端测试**：API client（mock fetch 验证请求/错误处理）、App 路由渲染、SideMenu 导航
+- **E2E**：基础 API / 配置 / AI / 元数据 / RSS 解析 / 订阅管理 / 115 登录 / 通知 / 导出导入
 
 ## 里程碑
 
