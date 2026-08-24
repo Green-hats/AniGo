@@ -6,7 +6,8 @@ type BgmInfo struct {
 	URL      string    `json:"url"`
 	Name     string    `json:"name"`
 	NameCn   string    `json:"nameCn"`
-	Eps      int       `json:"eps"`
+	Eps      int       `json:"eps"`            // wiki 解析的集数（已播出）
+	TotalEpisodes int  `json:"totalEpisodes"`  // 数据库章节数（总集数）
 	Date     DateTime  `json:"date"`
 	Images   BgmImages `json:"images"`
 	Season   int       `json:"season"`

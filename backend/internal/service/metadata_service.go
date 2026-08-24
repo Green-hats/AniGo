@@ -169,10 +169,8 @@ func (s *MetadataService) ToAni(ctx context.Context, info *domain.BgmInfo, ani *
 	ani.JpTitle = info.Name
 	ani.Season = bgm.GetSeason(info)
 	ani.TotalEpisodeNumber = s.bgm.GetEps(ctx, info)
-	// BGM 已播出集数 = BGM 实际收录的剧集数（番剧更新到哪 BGM 收录到哪）
-	if eps, err := s.bgm.GetEpisodes(ctx, info.ID); err == nil && len(eps) > 0 {
-		ani.BgmAiredEps = len(eps)
-	}
+	// BGM 已播出集数：按剧集 airdate <= 今天 统计（真实播出进度）
+	ani.BgmAiredEps = s.bgm.GetAiredEps(ctx, info)
 	ani.Ova = ova
 	ani.Score = score
 	if !info.Date.Time().IsZero() {

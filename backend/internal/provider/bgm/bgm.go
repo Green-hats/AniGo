@@ -245,12 +245,13 @@ func (b *BGM) RefreshToken(ctx context.Context) (access, refresh string, err err
 // parseSubject 解析 BGM subject JSON 为领域模型。
 func parseSubject(m map[string]interface{}) *domain.BgmInfo {
 	info := &domain.BgmInfo{
-		ID:       strVal(m["id"]),
-		URL:      "https://bgm.tv/subject/" + strVal(m["id"]),
-		Name:     strVal(m["name"]),
-		NameCn:   strVal(m["name_cn"]),
-		Eps:      intVal(m["eps"]),
-		Platform: strVal(m["platform"]),
+		ID:            strVal(m["id"]),
+		URL:           "https://bgm.tv/subject/" + strVal(m["id"]),
+		Name:          strVal(m["name"]),
+		NameCn:        strVal(m["name_cn"]),
+		Eps:           intVal(m["eps"]),             // 已播出集数
+		TotalEpisodes: intVal(m["total_episodes"]),  // 总集数
+		Platform:      strVal(m["platform"]),
 	}
 	if p := strVal(m["type"]); p != "" && info.Platform == "" {
 		info.Platform = p
@@ -343,13 +344,39 @@ func GetSeason(info *domain.BgmInfo) int {
 	return 1
 }
 
-// GetEps 获取总集数（优先剧集列表长度，回退 info.Eps）。
+// GetEps 获取总集数（数据库章节数 total_episodes，回退到已播出集数）。
 func (b *BGM) GetEps(ctx context.Context, info *domain.BgmInfo) int {
-	if info == nil || info.Eps < 1 {
+	if info == nil {
+		return 0
+	}
+	if info.TotalEpisodes > 0 {
+		return info.TotalEpisodes
+	}
+	return info.Eps
+}
+
+// GetAiredEps 获取已播出集数。
+// 优先：统计剧集列表中 airdate <= 今天 的集数（反映真实播出进度）。
+// 回退：wiki 的 eps。
+func (b *BGM) GetAiredEps(ctx context.Context, info *domain.BgmInfo) int {
+	if info == nil {
 		return 0
 	}
 	if eps, err := b.GetEpisodes(ctx, info.ID); err == nil && len(eps) > 0 {
-		return len(eps)
+		today := domain.Now()
+		count := 0
+		for _, e := range eps {
+			t := e.AirDate.Time()
+			if t.IsZero() {
+				continue
+			}
+			if !t.After(today) {
+				count++
+			}
+		}
+		if count > 0 {
+			return count
+		}
 	}
 	return info.Eps
 }
