@@ -144,7 +144,9 @@ func getItems(cfg *domain.Config, aiclient *ai.DeepSeek, ani *domain.Ani, rssURL
 	for i, it := range items {
 		pt := parsed[i]
 		if pt.Episode <= 0 {
-			continue // AI 也无法判断，丢弃
+			// AI 无法判断该条 → 回退正则解析结果，不丢弃
+			refined = append(refined, it)
+			continue
 		}
 		clone := it.Clone()
 		clone.Title = pt.Title

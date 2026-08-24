@@ -208,6 +208,12 @@ func fillAniDefaultsFromAni(a *domain.Ani) {
 	if a.CustomEpisodeStr == "" {
 		a.CustomEpisodeStr = domain.RENAME_REG_STR()
 	}
+	// 新订阅默认启用；Omit/Procrastinating/Message 默认开启
+	// （与 DefaultAni 一致，避免前端漏传时订阅被禁用）
+	a.Enable = true
+	a.Omit = true
+	a.Procrastinating = true
+	a.Message = true
 }
 
 // MergeAniMap 将 srcMap 中 JSON 存在的字段复制到 dst，保留当前集数与下载时间。
@@ -267,14 +273,16 @@ func (s *AniService) BatchEnable(ids []string, value bool) {
 func (s *AniService) PreviewAni(ani *domain.Ani) map[string]interface{} {
 	items := s.rss.GetItems(ani)
 	savePath := GetDownloadPath(s.cfg.Get(), ani)
+	omitItems := []int{}
 	preview := []*domain.Item{}
 	for _, it := range items {
+		it.HasDownloaded = false
 		preview = append(preview, it)
 	}
 	return map[string]interface{}{
 		"downloadPath": savePath,
 		"items":        preview,
-		"omitList":     []int{},
+		"omitList":     omitItems,
 	}
 }
 

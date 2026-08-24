@@ -105,6 +105,39 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 			continue
 		}
 
+		// 用户显式标记不下载的集数
+		if containsFloat(ani.NotDownload, episode) {
+			if item.Master && !is5 {
+				currentDownloadCount++
+			}
+			continue
+		}
+
+		// 只下载最新发布的集（DownloadNew）
+		if ani.DownloadNew {
+			newItem := items[len(items)-1]
+			if !item.PubDate.Time().IsZero() && !newItem.PubDate.Time().IsZero() {
+				if item.PubDate.Time().Format("2006-01-02") != newItem.PubDate.Time().Format("2006-01-02") {
+					if item.Master && !is5 {
+						currentDownloadCount++
+					}
+					continue
+				}
+			} else if item != newItem {
+				if item.Master && !is5 {
+					currentDownloadCount++
+				}
+				continue
+			}
+		}
+
+		// 延迟下载（发布时间距今不足 DelayedDownload 分钟的暂不下）
+		if !item.PubDate.Time().IsZero() && cfg.DelayedDownload > 0 {
+			if time.Now().Add(-time.Duration(cfg.DelayedDownload) * time.Minute).Before(item.PubDate.Time()) {
+				continue
+			}
+		}
+
 		// 云端文件已存在
 		if exists, _ := driver.FileExists(context.Background(), cfg, savePath+"/"+reName); exists {
 			if item.Master && !is5 {
