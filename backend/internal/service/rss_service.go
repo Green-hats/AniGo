@@ -278,7 +278,7 @@ func (s *RssService) getItems(ani *domain.Ani, rssURL, subgroupName string) []*d
 		s.logf("WARN", "rss", "%s rss获取失败: %v", ani.Title, err)
 		return nil
 	}
-	items := rss.Parse(cfg, ani, rssURL, subgroupName, xmlBody)
+	items := rss.Parse(ani, rssURL, subgroupName, xmlBody)
 	s.logf("INFO", "rss", "%s rss解析到 %d 个原始条目", ani.Title, len(items))
 	if len(items) == 0 || s.ai == nil || !cfg.AiEnabled {
 		// 仅 AI 解析：无 AI 则无法确定集号
@@ -293,7 +293,7 @@ func (s *RssService) getItems(ani *domain.Ani, rssURL, subgroupName string) []*d
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	parsed, err := s.ai.Parse(ctx, titles)
+	parsed, err := s.ai.Parse(ctx, ani, titles)
 	if err != nil {
 		// AI 失败 → 无集号来源，丢弃
 		s.logf("WARN", "rss", "%s ai解析失败: %v", ani.Title, err)
@@ -323,38 +323,9 @@ func (s *RssService) getItems(ani *domain.Ani, rssURL, subgroupName string) []*d
 	if len(refined) == 0 {
 		return nil
 	}
-	refined = s.filterByAI(cfg, ani, refined)
 	refined = rss.DistinctByEpisode(refined)
 	s.logf("INFO", "rss", "%s rss结束刷新, 共 %d 个条目", ani.Title, len(refined))
 	return refined
-}
-
-// filterByAI 用 AI 筛选器剔除不符合订阅规则的条目（尽力而为，失败不阻断）。
-func (s *RssService) filterByAI(cfg *domain.Config, ani *domain.Ani, items []*domain.Item) []*domain.Item {
-	// 无匹配/排除规则且未开启简中字幕筛选时无需 AI 筛选
-	if len(ani.Match) == 0 && len(ani.Exclude) == 0 && !cfg.AiSubtitleSC {
-		return items
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	titles := make([]string, len(items))
-	for i, it := range items {
-		titles[i] = it.Title
-	}
-	keep, err := s.ai.Filter(ctx, ani, titles)
-	if err != nil {
-		return items // AI 筛选失败 → 全部保留
-	}
-	var out []*domain.Item
-	for i, it := range items {
-		if i < len(keep) && keep[i] {
-			out = append(out, it)
-		}
-	}
-	if len(out) == 0 {
-		return items // 避免全删，回退
-	}
-	return out
 }
 
 // logf 写入 RSS 日志（logger 未注入时静默跳过）。

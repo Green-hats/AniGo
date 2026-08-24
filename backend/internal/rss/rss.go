@@ -18,7 +18,6 @@ var (
 	regMagnet    = regexp.MustCompile(`^magnet:\?xt=urn:btih:(\w+)`)
 	regEd2k      = regexp.MustCompile(`^ed2k://\|file\|([^|]+)\|(\d+)\|([A-Fa-f0-9]{32})\|/$`)
 	regGuidHex   = regexp.MustCompile(`^([a-z]|[0-9])+$`)
-	regSubgroup  = regexp.MustCompile(`^\{\{(.+)}}:(.+)$`)
 )
 
 // xmlItem 是原始 RSS 条目。
@@ -101,14 +100,14 @@ func normalizeURL(rawURL string) string {
 }
 
 // Parse 解析 RSS XML 为条目，应用 exclude/match/global 过滤。
-// 不做正则提取集号：Episode 保持 0，集号与重命名由调用方
-// （AI 解析 + RenameWithEpisode）在取得集号后完成。
-func Parse(cfg *domain.Config, ani *domain.Ani, rssURL, subgroupName, body string) []*domain.Item {
+// Parse 解析 RSS XML 为条目。
+// 不做正则提取集号：Episode 保持 0，集号、规则过滤（match/exclude/简中）与重命名
+// 由调用方（AI 解析 + RenameWithEpisode）在取得集号后完成。
+func Parse(ani *domain.Ani, rssURL, subgroupName, body string) []*domain.Item {
 	var doc rssDocument
 	if err := xml.Unmarshal([]byte(body), &doc); err != nil {
 		return nil
 	}
-	globalExcludeList := cfg.Exclude
 
 	var items []*domain.Item
 	for i := len(doc.Channel.Items) - 1; i >= 0; i-- {
@@ -188,65 +187,6 @@ func Parse(cfg *domain.Config, ani *domain.Ani, rssURL, subgroupName, body strin
 			it.PubDate = domain.DateTime(pubDate)
 		}
 
-		mapFn := func(s string) string {
-			m := regSubgroup.FindStringSubmatch(s)
-			if len(m) < 3 {
-				return s
-			}
-			if m[1] == subgroupName {
-				return m[2]
-			}
-			return ""
-		}
-
-		if len(ani.Exclude) > 0 {
-			drop := false
-			for _, ex := range ani.Exclude {
-				mapped := mapFn(ex)
-				if mapped == "" {
-					continue
-				}
-				if regexpMatch(mapped, it.Title) {
-					drop = true
-					break
-				}
-			}
-			if drop {
-				continue
-			}
-		}
-		if len(ani.Match) > 0 {
-			drop := false
-			for _, mt := range ani.Match {
-				mapped := mapFn(mt)
-				if mapped == "" {
-					continue
-				}
-				if !regexpMatch(mapped, it.Title) {
-					drop = true
-					break
-				}
-			}
-			if drop {
-				continue
-			}
-		}
-		if ani.GlobalExclude {
-			drop := false
-			for _, ex := range globalExcludeList {
-				mapped := mapFn(ex)
-				if mapped == "" {
-					continue
-				}
-				if regexpMatch(mapped, it.Title) {
-					drop = true
-					break
-				}
-			}
-			if drop {
-				continue
-			}
-		}
 		items = append(items, it)
 	}
 
@@ -294,14 +234,6 @@ func distinctByEpisodeKeepLast(items []*domain.Item) []*domain.Item {
 		out = append(out, m[k])
 	}
 	return out
-}
-
-func regexpMatch(pattern, s string) bool {
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		return strings.Contains(s, pattern)
-	}
-	return re.MatchString(s)
 }
 
 func parseInt64Safe(s string) int64 {

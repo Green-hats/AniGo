@@ -11,12 +11,13 @@ import (
 // 测试 Parse 的 JSON 解析逻辑（用 completeFn 注入固定回复）。
 func TestParseJSON(t *testing.T) {
 	d := NewDeepSeek(&domain.Config{AiApiKey: "test", AiModel: "deepseek-chat"})
+	ani := &domain.Ani{Title: "间谍过家家"}
 
 	// 1. 纯 JSON 数组
 	d.completeFn = func(ctx context.Context, system, user string) (string, error) {
 		return `[{"episode":3,"resolution":"1080P","subgroup":"ANi","title":"间谍过家家","isSpecial":false}]`, nil
 	}
-	out, err := d.Parse(context.Background(), []string{"[ANi] 间谍过家家 03 [1080P][Baha][WEB-DL]"})
+	out, err := d.Parse(context.Background(), ani, []string{"[ANi] 间谍过家家 03 [1080P][Baha][WEB-DL]"})
 	if err != nil {
 		t.Fatalf("Parse err: %v", err)
 	}
@@ -34,7 +35,7 @@ func TestParseJSON(t *testing.T) {
 	d.completeFn = func(ctx context.Context, system, user string) (string, error) {
 		return "```json\n[{\"episode\":6,\"resolution\":\"720P\",\"subgroup\":\"喵萌奶茶屋\",\"title\":\"间谍过家家\",\"isSpecial\":false}]\n```", nil
 	}
-	out2, err := d.Parse(context.Background(), []string{"[喵萌奶茶屋] 间谍过家家 06 [720P]"})
+	out2, err := d.Parse(context.Background(), ani, []string{"[喵萌奶茶屋] 间谍过家家 06 [720P]"})
 	if err != nil {
 		t.Fatalf("Parse fence err: %v", err)
 	}
@@ -46,7 +47,7 @@ func TestParseJSON(t *testing.T) {
 	d.completeFn = func(ctx context.Context, system, user string) (string, error) {
 		return `[]`, nil
 	}
-	out3, _ := d.Parse(context.Background(), []string{"t1", "t2"})
+	out3, _ := d.Parse(context.Background(), ani, []string{"t1", "t2"})
 	if len(out3) != 2 || out3[0].RawTitle != "t1" || out3[1].RawTitle != "t2" {
 		t.Fatalf("padding fail: %+v", out3)
 	}
@@ -55,7 +56,7 @@ func TestParseJSON(t *testing.T) {
 	d.completeFn = func(ctx context.Context, system, user string) (string, error) {
 		return `[{"rawTitle":"x","episode":4,"resolution":"1080P","subgroup":"北宇治字幕组","title":"与你相恋到生命尽头","isSpecial":false,"subtitleEmbed":"内封","videoCodec":"HEVC","source":"WebRip","colorDepth":"10bit","subtitleLang":"简繁日"}]`, nil
 	}
-	out4, err := d.Parse(context.Background(), []string{"[北宇治字幕组] 与你相恋到生命尽头 [04][WebRip][HEVC_AAC][简繁日内封]"})
+	out4, err := d.Parse(context.Background(), ani, []string{"[北宇治字幕组] 与你相恋到生命尽头 [04][WebRip][HEVC_AAC][简繁日内封]"})
 	if err != nil {
 		t.Fatalf("Parse signals err: %v", err)
 	}
@@ -80,43 +81,32 @@ func TestTrimJSONFence(t *testing.T) {
 	}
 }
 
-func TestFilterBoolArray(t *testing.T) {
-	d := NewDeepSeek(&domain.Config{AiApiKey: "test", AiModel: "deepseek-chat"})
-	d.completeFn = func(ctx context.Context, system, user string) (string, error) {
-		return `[true,false,true]`, nil
-	}
-	ani := &domain.Ani{Title: "间谍过家家"}
-	flags, err := d.Filter(context.Background(), ani, []string{"a", "b", "c"})
-	if err != nil {
-		t.Fatalf("Filter err: %v", err)
-	}
-	if len(flags) != 3 || flags[0] != true || flags[1] != false || flags[2] != true {
-		t.Fatalf("bad filter: %+v", flags)
-	}
-}
-
-// 简中字幕开关开启时，prompt 应包含简体中文字幕要求；关闭时不应包含。
-func TestFilterSubtitleSCPrompt(t *testing.T) {
+// 简中开关开启时，Parse 的 prompt 应包含简体中文字幕与匹配/排除规则；关闭时不含简中要求。
+func TestParsePromptIncludesRulesAndSubtitle(t *testing.T) {
 	var captured string
 
-	// 开启（默认）
+	// 开启简中 + 有匹配/排除规则
 	d := NewDeepSeek(&domain.Config{AiApiKey: "test", AiModel: "deepseek-chat", AiSubtitleSC: true})
 	d.completeFn = func(ctx context.Context, system, user string) (string, error) {
 		captured = system
-		return `[true]`, nil
+		return `[{"episode":1,"resolution":"1080P","subgroup":"","title":"T","isSpecial":false}]`, nil
 	}
-	_, _ = d.Filter(context.Background(), &domain.Ani{Title: "T"}, []string{"x"})
+	ani := &domain.Ani{Title: "T", Match: []string{"1080p"}, Exclude: []string{"合集"}}
+	_, _ = d.Parse(context.Background(), ani, []string{"x"})
 	if !strings.Contains(captured, "简体中文字幕") {
 		t.Errorf("开启简中开关时 prompt 应包含简中要求, got: %s", captured)
 	}
+	if !strings.Contains(captured, "1080p") || !strings.Contains(captured, "合集") {
+		t.Errorf("prompt 应包含匹配/排除规则, got: %s", captured)
+	}
 
-	// 关闭
+	// 关闭简中 → 不含简中要求
 	d2 := NewDeepSeek(&domain.Config{AiApiKey: "test", AiModel: "deepseek-chat", AiSubtitleSC: false})
 	d2.completeFn = func(ctx context.Context, system, user string) (string, error) {
 		captured = system
-		return `[true]`, nil
+		return `[{"episode":1,"resolution":"1080P","subgroup":"","title":"T","isSpecial":false}]`, nil
 	}
-	_, _ = d2.Filter(context.Background(), &domain.Ani{Title: "T"}, []string{"x"})
+	_, _ = d2.Parse(context.Background(), ani, []string{"x"})
 	if strings.Contains(captured, "简体中文字幕") {
 		t.Errorf("关闭简中开关时 prompt 不应包含简中要求, got: %s", captured)
 	}

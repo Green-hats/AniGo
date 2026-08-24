@@ -45,19 +45,13 @@ type ParsedTitle struct {
 	SubtitleLang  string `json:"subtitleLang"`  // 字幕语言：如 简繁日 / 简日 / 简 / 繁 / 空
 }
 
-// TitleParser 用 AI 批量解析 RSS 标题。
-// 一次调用处理多条标题，减少请求数、省成本、降延迟。
+// TitleParser 用 AI 批量解析 RSS 标题（解析 + 按订阅规则/简中筛选一步完成）。
 type TitleParser interface {
 	// Parse 解析一批标题，返回与输入等长、顺序一致的结果。
-	// 对无法解析的条目返回 Episode=0。
-	Parse(ctx context.Context, titles []string) ([]ParsedTitle, error)
-}
-
-// TitleFilter 用 AI 判断条目是否匹配订阅。
-type TitleFilter interface {
-	// Filter 判断每个条目是否保留（keep=true 保留）。
-	// 输入标题与输出的 keep 数组顺序一致、长度相等。
-	Filter(ctx context.Context, ani *Ani, titles []string) ([]bool, error)
+	// 结合 ani.Match/Exclude 与全局简中开关（AiSubtitleSC）判断：
+	// 不符合规则或不含简中字幕的条目 Episode 返回 0（表示丢弃）。
+	// 对无法解析出集号的条目同样返回 Episode=0。
+	Parse(ctx context.Context, ani *Ani, titles []string) ([]ParsedTitle, error)
 }
 
 // CloudFile 是一个云端文件条目。

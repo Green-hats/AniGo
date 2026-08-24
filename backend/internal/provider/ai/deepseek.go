@@ -108,21 +108,47 @@ func (d *DeepSeek) Ping(ctx context.Context) (string, error) {
 
 // parseSystemPrompt 组装标题解析提示词。
 // 规则部分固定使用内置默认（不允许用户修改），以保证 AI 输出格式稳定。
-func (d *DeepSeek) parseSystemPrompt() string {
+// 额外并入订阅的 match/exclude 规则与全局简中要求，让 AI 解析时同步筛选。
+func (d *DeepSeek) parseSystemPrompt(ani *domain.Ani) string {
 	rules := domain.DEFAULT_AI_PROMPT()
-	return "你是一个动漫BT资源标题解析器。用户会给你一批动漫下载资源标题，请把每个标题解析为结构化信息。\n\n" +
+
+	matchRules := "无（全部接受）"
+	if ani != nil && len(ani.Match) > 0 {
+		matchRules = joinRules(ani.Match)
+	}
+	excludeRules := "无"
+	if ani != nil && len(ani.Exclude) > 0 {
+		excludeRules = joinRules(ani.Exclude)
+	}
+	subtitleRule := ""
+	if d.cfg != nil && d.cfg.AiSubtitleSC {
+		subtitleRule = "仅保留包含简体中文字幕的资源（简中字幕或简中双语均视为满足）；纯繁体中文、无中文字幕或仅外挂英文/日文字幕的标题应丢弃。"
+	}
+
+	return "你是一个动漫BT资源标题解析器。用户会给你一批动漫下载资源标题，请把每个标题解析为结构化信息，并判断其是否符合订阅规则。\n\n" +
+		"匹配规则（标题需满足，可为空）：" + matchRules + "\n" +
+		"排除规则（标题不得命中，可为空）：" + excludeRules + "\n" +
+		subtitleRule + "\n\n" +
+		"判定方法：标题需同时满足匹配规则、不命中排除规则" + func() string {
+			if d.cfg != nil && d.cfg.AiSubtitleSC {
+				return "、且包含简体中文字幕"
+			}
+			return ""
+		}() + "；若不符合任一要求或无法判断集数，则 episode 返回 0（表示丢弃）。\n\n" +
 		rules + "\n\n" +
 		"只输出 JSON，不要任何其他文字。格式如下（数组，顺序与输入一致）：\n" +
 		`[{"rawTitle":"原样返回标题","episode":3,"resolution":"1080P","subgroup":"ANi","title":"间谍过家家","isSpecial":false,"subtitleEmbed":"内嵌","videoCodec":"HEVC","source":"WebRip","colorDepth":"10bit","subtitleLang":"简繁日"}]`
 }
 
 // Parse 批量解析标题（TitleParser 接口实现）。
-func (d *DeepSeek) Parse(ctx context.Context, titles []string) ([]domain.ParsedTitle, error) {
+// 结合 ani 的 match/exclude 规则与全局简中开关，在解析时同步筛选：
+// 不符合规则的条目 Episode=0（调用方据此丢弃）。
+func (d *DeepSeek) Parse(ctx context.Context, ani *domain.Ani, titles []string) ([]domain.ParsedTitle, error) {
 	if len(titles) == 0 {
 		return []domain.ParsedTitle{}, nil
 	}
 	user, _ := json.Marshal(titles)
-	raw, err := d.completeFn(ctx, d.parseSystemPrompt(), string(user))
+	raw, err := d.completeFn(ctx, d.parseSystemPrompt(ani), string(user))
 	if err != nil {
 		return nil, err
 	}
@@ -142,50 +168,6 @@ func (d *DeepSeek) Parse(ctx context.Context, titles []string) ([]domain.ParsedT
 		}
 		pt.RawTitle = titles[i]
 		result[i] = pt
-	}
-	return result, nil
-}
-
-// Filter 用 AI 判断标题是否匹配订阅（保留）。
-func (d *DeepSeek) Filter(ctx context.Context, ani *domain.Ani, titles []string) ([]bool, error) {
-	if len(titles) == 0 {
-		return []bool{}, nil
-	}
-	matchRules := "无（全部接受）"
-	if len(ani.Match) > 0 {
-		matchRules = joinRules(ani.Match)
-	}
-	excludeRules := "无"
-	if len(ani.Exclude) > 0 {
-		excludeRules = joinRules(ani.Exclude)
-	}
-	subtitleRule := ""
-	if d.cfg != nil && d.cfg.AiSubtitleSC {
-		subtitleRule = "另外，仅保留包含简体中文字幕的资源（简中字幕或简中双语均视为满足）；纯繁体中文、无中文字幕或仅外挂英文/日文字幕的标题应排除。"
-	}
-	system := fmt.Sprintf(`你是动漫资源订阅过滤助手。番剧名：%s。匹配规则（标题需满足）：%s。排除规则（标题不得命中）：%s。
-%s
-对用户给出的每个标题，判断是否应保留（满足匹配规则且不命中排除规则）。只输出 JSON 布尔数组，如 [true,false,true]。不要输出任何其他文字。`,
-		ani.Title, matchRules, excludeRules, subtitleRule)
-	user, _ := json.Marshal(titles)
-	raw, err := d.completeFn(ctx, system, string(user))
-	if err != nil {
-		return nil, err
-	}
-	raw = trimJSONFence(raw)
-	var flags []bool
-	if err := json.Unmarshal([]byte(raw), &flags); err != nil {
-		return nil, fmt.Errorf("AI 过滤返回 JSON 解析失败: %w", err)
-	}
-	result := make([]bool, len(titles))
-	for i := range result {
-		result[i] = true // 默认保留
-	}
-	for i, v := range flags {
-		if i >= len(result) {
-			break
-		}
-		result[i] = v
 	}
 	return result, nil
 }
@@ -218,4 +200,3 @@ func joinRules(rules []string) string {
 
 // 确保 DeepSeek 实现端口接口。
 var _ domain.TitleParser = (*DeepSeek)(nil)
-var _ domain.TitleFilter = (*DeepSeek)(nil)
