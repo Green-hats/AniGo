@@ -10,9 +10,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/greenhats/anigo/internal/cloud"
 	"github.com/greenhats/anigo/internal/httpapi"
 	"github.com/greenhats/anigo/internal/service"
 	"github.com/greenhats/anigo/internal/store"
+	"github.com/greenhats/anigo/internal/task"
 )
 
 func main() {
@@ -34,9 +36,15 @@ func main() {
 	}
 	rssService := service.NewRssService(cfgService)
 	aniService := service.NewAniService(cfgService, rssService)
+	cloudReg := cloud.NewRegistry()
+	downloadService := service.NewDownloadService(cfgService, rssService, cloudReg, cache)
 
-	// 3. HTTP 层
-	srv := httpapi.NewServer(cfgService, aniService, rssService)
+	// 3. 后台任务
+	taskMgr := task.NewTaskManager(cfgService, downloadService)
+	taskMgr.Start()
+
+	// 4. HTTP 层
+	srv := httpapi.NewServer(cfgService, aniService, rssService, downloadService)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -59,6 +67,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	fmt.Println("正在关闭服务...")
+	taskMgr.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = httpSrv.Shutdown(ctx)

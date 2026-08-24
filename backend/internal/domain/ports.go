@@ -50,3 +50,41 @@ type TitleFilter interface {
 	// 输入标题与输出的 keep 数组顺序一致、长度相等。
 	Filter(ctx context.Context, ani *Ani, titles []string) ([]bool, error)
 }
+
+// CloudFile 是一个云端文件条目。
+type CloudFile struct {
+	Name     string
+	Size     int64
+	IsDir    bool
+	ID       string // 提供方特定的目录 id（115 cid）
+	PickCode string // 提供方特定的下载码（115 pc）
+}
+
+// CloudDriver 是统一网盘驱动接口。目前实现 driver_115，后续扩展其他网盘。
+// 网盘驱动只做"路径/磁力 → 云端文件"的原子操作，不感知订阅。
+// 需要网盘凭据的方法接收 cfg 作为参数，保证始终拿到最新配置。
+type CloudDriver interface {
+	// Name 返回网盘名称。
+	Name() string
+	// Login 验证网盘凭据（如 115 Cookie）是否有效。
+	Login(ctx context.Context, test bool, cfg *Config) (bool, error)
+	// AddOfflineTask 离线下载一个磁力/ed2k 任务到指定云端目录。
+	AddOfflineTask(ctx context.Context, cfg *Config, magnet, destPath string) error
+	// FileExists 检查云端路径上的文件是否存在。
+	FileExists(ctx context.Context, cfg *Config, path string) (bool, error)
+	// FileURL 返回云端文件的可播放/下载 URL。
+	FileURL(ctx context.Context, cfg *Config, path string) (string, error)
+	// ListDir 列出云端目录的文件。
+	ListDir(ctx context.Context, cfg *Config, path string) ([]CloudFile, error)
+	// DeleteDir 递归删除云端目录。
+	DeleteDir(ctx context.Context, cfg *Config, path string) error
+	// GetLoginStatus 返回最近的登录状态。
+	GetLoginStatus() LoginStatus
+}
+
+// LoginStatus 描述最近一次网盘登录结果。
+type LoginStatus struct {
+	Configured bool   `json:"configured"`
+	OK         bool   `json:"loginOK"`
+	Message    string `json:"message"`
+}

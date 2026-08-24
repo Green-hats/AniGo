@@ -57,18 +57,6 @@ func (s *Server) handleBatchEnable(c *gin.Context) {
 	okMsg(c, "修改完成")
 }
 
-func (s *Server) handleRefreshAni(c *gin.Context) {
-	var body domain.IdDTO
-	if !readJSONOrFail(c, &body) {
-		return
-	}
-	if s.ani.FindAniByID(body.ID) == nil {
-		fail(c, "订阅不存在")
-		return
-	}
-	okMsg(c, "已开始刷新RSS")
-}
-
 func (s *Server) handlePreviewAni(c *gin.Context) {
 	var body domain.Ani
 	if !readJSONOrFail(c, &body) {

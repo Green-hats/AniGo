@@ -13,20 +13,22 @@ import (
 )
 // Server 是 Gin HTTP 应用服务。
 type Server struct {
-	engine *gin.Engine
-	cfg    *service.ConfigService
-	ani    *service.AniService
-	rss    *service.RssService
+	engine   *gin.Engine
+	cfg      *service.ConfigService
+	ani      *service.AniService
+	rss      *service.RssService
+	download *service.DownloadService
 }
 
 // NewServer 构建注册了所有路由的 Gin 引擎。
-func NewServer(cfg *service.ConfigService, ani *service.AniService, rss *service.RssService) *Server {
+func NewServer(cfg *service.ConfigService, ani *service.AniService, rss *service.RssService, download *service.DownloadService) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	s := &Server{
-		engine: gin.New(),
-		cfg:    cfg,
-		ani:    ani,
-		rss:    rss,
+		engine:   gin.New(),
+		cfg:      cfg,
+		ani:      ani,
+		rss:      rss,
+		download: download,
 	}
 	s.register()
 	return s
@@ -62,6 +64,12 @@ func (s *Server) register() {
 	r.POST("/api/refreshAni", s.handleRefreshAni)
 	r.POST("/api/previewAni", s.handlePreviewAni)
 	r.POST("/api/downloadPath", s.handleDownloadPath)
+
+	// 下载
+	r.POST("/api/downloadLoginTest", s.handleDownloadLoginTest)
+	r.POST("/api/downloadStatus", s.handleDownloadStatus)
+	r.POST("/api/refreshAll", s.handleRefreshAll)
+	r.POST("/api/deleteTorrent", s.handleDeleteTorrent)
 
 	// AI
 	r.POST("/api/aiPing", s.handleAIPing)
