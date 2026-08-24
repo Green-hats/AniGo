@@ -1,7 +1,12 @@
 package service
 
 import (
+	"archive/zip"
 	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/greenhats/anigo/internal/domain"
@@ -95,6 +100,120 @@ func (s *ConfigService) SaveAniList(list []*domain.Ani) error {
 // ClearCache 清空内存 TTL 缓存。
 func (s *ConfigService) ClearCache() {
 	s.cache.Clear()
+}
+
+// ExportConfig 将配置目录打包为 zip 备份，写入 w。
+// 包含 files/、torrents/ 目录以及 config.v2.json、ani.v2.json。
+func (s *ConfigService) ExportConfig(w io.Writer) error {
+	configDir := s.Dir()
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+
+	addZipDir := func(dir string) error {
+		return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil || info.IsDir() {
+				return nil
+			}
+			if strings.HasPrefix(filepath.Base(path), ".") {
+				return nil
+			}
+			rel, err := filepath.Rel(configDir, path)
+			if err != nil {
+				return nil
+			}
+			rel = filepath.ToSlash(rel)
+			fw, err := zw.Create(rel)
+			if err != nil {
+				return err
+			}
+			src, err := os.Open(path)
+			if err != nil {
+				return nil
+			}
+			_, _ = io.Copy(fw, src)
+			src.Close()
+			return nil
+		})
+	}
+	// 目录不存在时跳过（首次启动没有 files/torrents）
+	for _, dir := range []string{"files", "torrents"} {
+		d := filepath.Join(configDir, dir)
+		if _, err := os.Stat(d); err == nil {
+			if err := addZipDir(d); err != nil {
+				return err
+			}
+		}
+	}
+	// 两个配置文件
+	for _, name := range []string{"config.v2.json", "ani.v2.json"} {
+		p := filepath.Join(configDir, name)
+		if _, err := os.Stat(p); err != nil {
+			continue
+		}
+		fw, err := zw.Create(name)
+		if err != nil {
+			return err
+		}
+		src, err := os.Open(p)
+		if err != nil {
+			continue
+		}
+		_, _ = io.Copy(fw, src)
+		src.Close()
+	}
+	return nil
+}
+
+// ImportConfig 从 zip 备份恢复 config.v2.json 与 ani.v2.json，
+// 然后重新加载内存中的配置与订阅。
+func (s *ConfigService) ImportConfig(zipPath string) error {
+	zr, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return err
+	}
+	defer zr.Close()
+	configDir := s.Dir()
+	needReload := false
+	for _, f := range zr.File {
+		name := filepath.Base(f.Name)
+		if name != "config.v2.json" && name != "ani.v2.json" {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			continue
+		}
+		out, err := os.Create(filepath.Join(configDir, name))
+		if err != nil {
+			rc.Close()
+			return err
+		}
+		_, _ = io.Copy(out, rc)
+		rc.Close()
+		out.Close()
+		needReload = true
+	}
+	if !needReload {
+		return nil
+	}
+	return s.reload()
+}
+
+// reload 从 store 重新加载配置与订阅到内存。
+func (s *ConfigService) reload() error {
+	cfg, err := s.store.LoadConfig()
+	if err != nil {
+		return err
+	}
+	anis, err := s.store.LoadAnis()
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.cfg = cfg
+	s.aniLst = anis
+	s.mu.Unlock()
+	return nil
 }
 
 // mergeConfigInto 将 raw 中 JSON 存在的字段合并进 cur，

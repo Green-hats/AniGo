@@ -1,7 +1,10 @@
 package httpapi
 
 import (
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 
@@ -44,6 +47,8 @@ func (s *Server) register() {
 	r.POST("/api/config", s.handleConfig)
 	r.POST("/api/setConfig", s.handleSetConfig)
 	r.POST("/api/clearCache", s.handleClearCache)
+	r.GET("/api/exportConfig", s.handleExportConfig)
+	r.POST("/api/importConfig", s.handleImportConfig)
 }
 
 func (s *Server) handlePing(c *gin.Context) {
@@ -96,6 +101,47 @@ func (s *Server) handleCustomCss(c *gin.Context) {
 	c.Header("Content-Type", "text/css; charset=utf-8")
 	c.Header("Cache-Control", "no-store")
 	c.String(http.StatusOK, css)
+}
+
+// handleExportConfig 下载配置备份 zip。
+func (s *Server) handleExportConfig(c *gin.Context) {
+	c.Header("Content-Type", "application/zip")
+	c.Header("Content-Disposition", `inline; filename="anigo.backup.zip"`)
+	if err := s.cfg.ExportConfig(c.Writer); err != nil {
+		fail(c, err.Error())
+	}
+}
+
+// handleImportConfig 上传并恢复配置备份 zip。
+func (s *Server) handleImportConfig(c *gin.Context) {
+	if err := c.Request.ParseMultipartForm(50 << 20); err != nil {
+		fail(c, err.Error())
+		return
+	}
+	file, _, err := c.Request.FormFile("file")
+	if err != nil {
+		fail(c, "未获取到文件")
+		return
+	}
+	defer file.Close()
+	tmp := filepath.Join(os.TempDir(), "anigo-import.zip")
+	f, err := os.Create(tmp)
+	if err != nil {
+		fail(c, err.Error())
+		return
+	}
+	if _, err := io.Copy(f, file); err != nil {
+		f.Close()
+		fail(c, err.Error())
+		return
+	}
+	f.Close()
+	defer os.Remove(tmp)
+	if err := s.cfg.ImportConfig(tmp); err != nil {
+		fail(c, err.Error())
+		return
+	}
+	okMsg(c, "导入成功")
 }
 
 // writeResult 以 HTTP 200 写 domain.Result（Java 总是返回 200）。
