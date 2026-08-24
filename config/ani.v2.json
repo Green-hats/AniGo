@@ -45,7 +45,7 @@
     "customRenameTemplate": "[${subgroup}] ${title} S${seasonFormat}E${episodeFormat}",
     "customPriorityKeywordsEnable": false,
     "customPriorityKeywords": [],
-    "lastDownloadTime": 1787578235160,
+    "lastDownloadTime": 1787579712505,
     "message": true,
     "customTagsEnable": false,
     "customTags": []

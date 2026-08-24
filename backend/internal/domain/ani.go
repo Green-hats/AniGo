@@ -96,6 +96,7 @@ type Ani struct {
 	Enable                       bool         `json:"enable"`
 	CurrentEpisodeNumber         int          `json:"currentEpisodeNumber"`
 	TotalEpisodeNumber           int          `json:"totalEpisodeNumber"`
+	BgmAiredEps                  int          `json:"bgmAiredEps"`
 	ThemoviedbName               string       `json:"themoviedbName"`
 	Type                         string       `json:"type"`
 	BgmUrl                       string       `json:"bgmUrl"`

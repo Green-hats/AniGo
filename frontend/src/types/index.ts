@@ -159,6 +159,7 @@ export interface Ani {
   exclude: string[]
   currentEpisodeNumber: number
   totalEpisodeNumber: number
+  bgmAiredEps: number
   score: number
   offset: number
   sort: number
