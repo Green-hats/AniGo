@@ -202,6 +202,7 @@ func DefaultConfig() *Config {
 		TmdbApi:                     "https://api.themoviedb.org",
 		TmdbAnime:                   true,
 		DownloadToolType:            "115",
+		Pan115Cookie:                defaultPan115Cookie(),
 		DownloadRetry:               3,
 		DownloadPathTemplate:        "番剧/${title}/Season ${season}",
 		OvaDownloadPathTemplate:     "剧场版/${title}",

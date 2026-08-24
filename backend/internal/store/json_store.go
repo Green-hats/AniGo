@@ -144,6 +144,9 @@ func fillConfigDefaults(c, def *domain.Config, present map[string]bool) {
 	if !present["downloadToolType"] {
 		c.DownloadToolType = def.DownloadToolType
 	}
+	if !present["pan115Cookie"] {
+		c.Pan115Cookie = def.Pan115Cookie
+	}
 	if !present["downloadPathTemplate"] {
 		c.DownloadPathTemplate = def.DownloadPathTemplate
 	}
