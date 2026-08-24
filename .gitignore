@@ -1,5 +1,6 @@
 # 运行时生成的配置目录
 backend/config/
+config/
 
 # 构建产物
 backend/bin/
