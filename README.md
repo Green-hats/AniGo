@@ -42,6 +42,8 @@ CONFIG=/path ./backend/bin/anigo  # 自定义配置目录
 
 首次启动自动生成 `config.v2.json` / `ani.v2.json`。浏览器打开 `http://服务器:7789` 即可管理。
 
+> 配置目录按**启动时的工作目录**解析：默认 `./config`，`CONFIG` 环境变量可指定。务必始终在仓库根目录启动，避免在 `backend/` 下启动导致生成第二份配置。
+
 ### 开发模式（前后端热更新）
 
 ```bash
@@ -64,9 +66,9 @@ make dev    # 后端 :7789 + Vite 热更新 :37789（/api 自动代理）
 }
 ```
 
-支持 OpenAI 兼容接口（DeepSeek / OpenAI / 通义 / 智谱 等）。AI 失败时自动回退正则解析。
+支持 OpenAI 兼容接口（DeepSeek / OpenAI / 通义 / 智谱 等）。集号提取与规则匹配全部由 AI 完成；某源连续失败会进入退避期，不影响其他订阅。
 
-> 项目内置的测试密钥放在 `backend/internal/domain/secrets.go`（已被 .gitignore 排除，不提交）。clone 后需自行创建该文件或改用环境变量。
+> 项目内置的测试密钥放在 `backend/internal/domain/secrets.go`（已被 .gitignore 排除，不提交）。该文件被 `config.go` 的默认值引用，**clone 后需自行创建该文件**（否则编译报错），或将 Key/Cookie 直接填到设置页（运行时以配置为准）。
 
 ### 115 网盘下载
 

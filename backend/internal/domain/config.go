@@ -215,6 +215,23 @@ const defaultAiPrompt = `规则：
 // DEFAULT_AI_PROMPT 暴露默认 AI 要求。
 func DEFAULT_AI_PROMPT() string { return defaultAiPrompt }
 
+// defaultNotificationTemplate 默认全局通知模板（对齐上游 ani-rss ConfigUtil）。
+// 去掉上游依赖下载服务/集标题的 ${downloadPath} 与 ${episodeTitle}（当前未接入）。
+const defaultNotificationTemplate = `${emoji}${emoji}${emoji}
+事件类型: ${action}
+标题: ${title}
+评分: ${score}
+TMDB: ${tmdburl}
+TMDB标题: ${themoviedbName}
+BGM: ${bgmUrl}
+季: ${season}
+集: ${episode}
+字幕组: ${subgroup}
+进度: ${currentEpisodeNumber}/${totalEpisodeNumber}
+首播:  ${year}年${month}月${date}日
+事件: ${text}
+${emoji}${emoji}${emoji}`
+
 // DefaultConfig 返回与遗留 ConfigUtil 静态块一致的默认配置。
 func DefaultConfig() *Config {
 	return &Config{
@@ -257,6 +274,7 @@ func DefaultConfig() *Config {
 		AiModel:                     "deepseek-v4-flash",
 		AiPrompt:                    defaultAiPrompt,
 		AiSubtitleSC:                true,
+		NotificationTemplate:        defaultNotificationTemplate,
 	}
 }
 

@@ -1,7 +1,11 @@
 # M5 元数据 Provider 实现参考
 
-> 本文档从老项目 ani-rss-go 提取 BGM/TMDB/Mikan/groupregex 的实现要点，
-> 作为 anigo M5 元数据 provider 的移植蓝图。同时记录 115 驱动的补充要点。
+> **历史参考文档**：从老项目 ani-rss-go 提取 BGM/TMDB/Mikan/groupregex 的实现要点，作为 anigo M5 元数据 provider 的移植蓝图。
+>
+> ⚠️ 注意：文中的部分内容已与当前实现不一致——
+> - **Mikan（第 3 节）未移植**，番剧源以 animes.garden 为准（见 `provider/garden` 与 `docs/architecture.md` 5.3 节）
+> - BGM/TMDB 已按本文要点移植到 `provider/bgm`、`provider/tmdb`
+> - 115 驱动（第 0 节）：anigo 当前**提交后立即返回**，不做轮询等待（老项目的轮询等待未移植）
 
 ## 0. 老项目 115 驱动补充要点（M4 待补）
 

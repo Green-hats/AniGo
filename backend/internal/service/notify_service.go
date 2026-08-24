@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/greenhats/anigo/internal/domain"
 	"github.com/greenhats/anigo/internal/provider/notifier"
@@ -40,7 +41,23 @@ func (s *NotifyService) Test(ctx context.Context, nc *domain.NotificationConfig,
 	return n.Send(ctx, nc, &domain.Notification{
 		Text:   text,
 		Status: domain.NotifyError,
+		Ani:    sampleAni(),
 	})
+}
+
+// sampleAni 构造一个示例订阅，用于测试通知时预览占位符渲染效果。
+func sampleAni() *domain.Ani {
+	return &domain.Ani{
+		Title:                "示例番剧",
+		JpTitle:              "サンプル",
+		Season:               1,
+		Subgroup:             "ANi",
+		Score:                8.5,
+		BgmUrl:               "https://bgm.tv/subject/123",
+		CurrentEpisodeNumber: 1,
+		TotalEpisodeNumber:   12,
+		ReleaseDate:          domain.Date(time.Now()),
+	}
 }
 
 // Registry 返回通知器注册表（供配置页测试等）。

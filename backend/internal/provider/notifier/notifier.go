@@ -60,8 +60,21 @@ func (n *Notifier) replaceBase(tmpl string, ani *domain.Ani, cfg *domain.Notific
 		tmpl = strings.ReplaceAll(tmpl, "${episode}", strconv.Itoa(ani.CurrentEpisodeNumber))
 		tmpl = strings.ReplaceAll(tmpl, "${episodeFormat}", fmt.Sprintf("%02d", ani.CurrentEpisodeNumber))
 		tmpl = strings.ReplaceAll(tmpl, "${themoviedbName}", ani.ThemoviedbName)
+		tmpl = strings.ReplaceAll(tmpl, "${score}", strconv.FormatFloat(ani.Score, 'f', -1, 64))
+		tmpl = strings.ReplaceAll(tmpl, "${subgroup}", ani.Subgroup)
+		tmpl = strings.ReplaceAll(tmpl, "${currentEpisodeNumber}", strconv.Itoa(ani.CurrentEpisodeNumber))
+		tmpl = strings.ReplaceAll(tmpl, "${totalEpisodeNumber}", strconv.Itoa(ani.TotalEpisodeNumber))
+		tmdbID, tmdbURLStr := "", ""
 		if ani.Tmdb != nil {
-			tmpl = strings.ReplaceAll(tmpl, "${tmdbid}", strconv.Itoa(ani.Tmdb.ID))
+			tmdbID = strconv.Itoa(ani.Tmdb.ID)
+			tmdbURLStr = tmdbURL(ani)
+		}
+		tmpl = strings.ReplaceAll(tmpl, "${tmdbid}", tmdbID)
+		tmpl = strings.ReplaceAll(tmpl, "${tmdburl}", tmdbURLStr)
+		if d := ani.ReleaseDate.Time(); !d.IsZero() {
+			tmpl = strings.ReplaceAll(tmpl, "${year}", strconv.Itoa(d.Year()))
+			tmpl = strings.ReplaceAll(tmpl, "${month}", strconv.Itoa(int(d.Month())))
+			tmpl = strings.ReplaceAll(tmpl, "${date}", strconv.Itoa(d.Day()))
 		}
 		tmpl = strings.ReplaceAll(tmpl, "${jpTitle}", ani.JpTitle)
 		tmpl = strings.ReplaceAll(tmpl, "${bgmUrl}", ani.BgmUrl)
@@ -71,6 +84,18 @@ func (n *Notifier) replaceBase(tmpl string, ani *domain.Ani, cfg *domain.Notific
 	tmpl = strings.ReplaceAll(tmpl, "${emoji}", emoji)
 	tmpl = strings.ReplaceAll(tmpl, "${action}", action)
 	return tmpl
+}
+
+// tmdbURL 返回 TMDB 详情页 URL（OVA/剧场版走 movie，其余走 tv）。
+func tmdbURL(ani *domain.Ani) string {
+	if ani.Tmdb == nil || ani.Tmdb.ID == 0 {
+		return ""
+	}
+	t := "tv"
+	if ani.Ova {
+		t = "movie"
+	}
+	return fmt.Sprintf("https://www.themoviedb.org/%s/%d", t, ani.Tmdb.ID)
 }
 
 // StatusMeta 返回状态对应的 emoji 与动作名。
@@ -148,12 +173,10 @@ func (t *Telegram) Send(ctx context.Context, cfg *domain.NotificationConfig, n *
 	} else if cfg.TelegramFormat == "html" {
 		form.Set("parse_mode", "HTML")
 	}
-	if cfg.TelegramImage {
+	if cfg.TelegramImage && n.Ani != nil && n.Ani.Image != "" {
 		u := fmt.Sprintf("%s/bot%s/sendPhoto", host, cfg.TelegramBotToken)
 		form.Set("caption", tmpl)
-		if n.Ani != nil && n.Ani.Image != "" {
-			form.Set("photo", n.Ani.Image)
-		}
+		form.Set("photo", n.Ani.Image)
 		return t.sendHTTP(ctx, "POST", u, nil, form, nil)
 	}
 	u := fmt.Sprintf("%s/bot%s/sendMessage", host, cfg.TelegramBotToken)

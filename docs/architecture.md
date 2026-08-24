@@ -1,6 +1,6 @@
 # anigo — 架构设计文档
 
-> ani-rss-go 的**全新架构重构**版本。本文档是重构的蓝图，供实现前评审。
+> ani-rss-go 的**全新架构重构**版本。本文档是重构的设计蓝图；除第 11 节里程碑外，各节描述的是**目标架构**。实现状态与文档不一致处已在文中标注「未实现」。
 
 ## 1. 背景与目标
 
@@ -22,7 +22,7 @@ ani-rss-go 是一个"云端追番"工具：RSS 自动离线下载到网盘（当
 | HTTP | Gin | 路由/中间件/绑定 |
 | DI | 手动（main 组装） | 接口注入，不用 fx 等黑盒 |
 | 存储 | 标准库 JSON 文件 | `encoding/json` + 文件锁 |
-| 前端 | React + TypeScript + Vite | 同仓 `web/` 文件夹，构建产物嵌入后端 |
+| 前端 | React + TypeScript + Vite | 同仓 `frontend/` 文件夹，构建产物嵌入后端 |
 | 日志 | 标准库 `log/slog` | 结构化日志 |
 | 并发 | context + goroutine | 后台任务可控优雅退出 |
 
@@ -37,34 +37,37 @@ anigo/
 │       ├── domain/               # 【领域层】纯模型 + 接口（不依赖具体实现）
 │       │   ├── config.go         #   Config / Login / NotificationConfig
 │       │   ├── ani.go            #   Ani 订阅 / StandbyRss / Tmdb
-│       │   ├── item.go           #   Item / TorrentsInfo / 枚举
+│       │   ├── misc.go           #   Item / TorrentsInfo / 枚举
+│       │   ├── time.go           #   DateTime / Date 自定义 JSON 解析
 │       │   └── ports.go          #   ★ 所有端口接口定义（核心）
 │       ├── store/                # 【适配器】JSON 文件持久化
-│       │   └── json_store.go     #   ConfigStore / AniStore 实现
+│       │   └── json_store.go     #   ConfigStore / AniStore 实现 + TTL 缓存
 │       ├── service/              # 【应用层】业务逻辑（依赖端口接口）
 │       │   ├── config_service.go #   配置读写/部分合并/默认值
 │       │   ├── ani_service.go    #   订阅增删改/列表分组
 │       │   ├── download_service.go#  下载主流程/缺集/摸鱼/完结
 │       │   ├── rss_service.go    #   RSS 聚合/过滤/剧集提取
+│       │   ├── metadata_service.go#  元数据编排（BGM/TMDB/番剧源）
 │       │   └── notify_service.go #   通知分发
 │       ├── rss/                  #   纯函数：RSS XML 解析
 │       ├── rename/               #   纯函数：剧集识别 + 重命名模板
 │       ├── provider/             # 【适配器】外部服务
-│       │   ├── bgm/              #   Bangumi（评分/剧集/OAuth）
+│       │   ├── bgm/              #   Bangumi（评分/剧集/OAuth，OAuth 未接入 HTTP）
 │       │   ├── tmdb/             #   TMDB 元数据
-│       │   ├── mikan/            #   Mikan 番剧源
-│       │   └── notifier/         #   通知器（telegram/bark/...）
+│       │   ├── garden/           #   animes.garden 番剧源（唯一番剧源）
+│       │   ├── ai/               #   AI 引擎（DeepSeek，OpenAI 兼容）
+│       │   └── notifier/         #   通知器（telegram/bark/serverchan/webhook/shell/system）
 │       ├── cloud/                # 【适配器】网盘
-│       │   ├── cloud.go          #   CloudDriver 接口 + 注册表
-│       │   └── driver_115/       #   115 实现
+│       │   ├── registry.go       #   CloudDriver 注册表
+│       │   └── driver_115/       #   115 实现（CloudDriver 接口见 domain/ports.go）
 │       ├── httpapi/              # 【适配器】Gin HTTP 层（只做 HTTP 适配）
-│       │   ├── server.go         #   Gin 实例 + 中间件
-│       │   ├── router.go         #   路由注册
+│       │   ├── server.go         #   Gin 实例 + 中间件 + 路由注册
+│       │   ├── static.go         #   嵌入前端静态资源
 │       │   └── handler_*.go      #   handler（薄，转发 service）
-│       └── task/                 #   后台任务循环（RSS 轮询 / BGM 刷新）
+│       └── task/                 #   后台任务循环（RSS 轮询）
 ├── frontend/                     # 前端（React+TS+Vite）
 ├── docs/                         # 文档
-└── go.work                       # Go workspace（后端模块 + 未来共享代码）
+└── go.work                       # Go workspace
 ```
 
 ## 4. 分层与依赖规则（Hexagonal）
@@ -167,17 +170,17 @@ type FansubSource interface {
 }
 ```
 
-**番剧源首选：animes.garden**（用户已确认 RSS 端用它的 API）
+**番剧源：animes.garden**（唯一番剧源，用户已确认 RSS 端用它的 API）
 - 聚合站：動漫花園 + 蜜柑 + 萌番组 + ANi 四源合一，一个订阅覆盖全部字幕组
 - 开放 API（`https://api.animes.garden`）：
   - `GET /feed.xml` — 自定义 RSS 订阅（`?subject=&fansub=&filter=`），标题规整自带 `SxxExx`，guid 带 infohash
   - `GET /resources` — 资源搜索（include/exclude/keywords/fansub/type 过滤）
   - `GET /subjects` — 番剧周列表（首页番剧源浏览）
   - `GET /detail/{provider}/{id}` — 资源详情
-- 官方 anipar 标题解析器（按字幕组定制），印证标题格式多样——我们以 AI 解析为主、正则兜底
-- 备选源：Mikan（老项目主源）、ani-bt，通过 `FansubSource` 接口可插拔
+- 已实现：`provider/garden` 提供 `ListSubjects` / `Group` / `BuildRSS` / `GetSubjectIdFromURL`
+- ~~备选源 Mikan / ani-bt~~（未实现，Mikan 的移植参考见 `docs/m5-reference.md`）
 
-BGM 特有能力（评分/OAuth/剧集标题）通过**类型断言**按需暴露（`if b, ok := provider.(interface{ Rate(...) }); ok`），避免接口臃肿。
+BGM 特有能力（评分/剧集标题）直接调用 `provider/bgm`；OAuth 代码在 provider 中实现但**未接入 HTTP 层**（未实现）。
 
 ### 5.4 通知端口
 
@@ -228,32 +231,31 @@ type ItemFilter interface {
 }
 ```
 
-**引擎分层**（可插拔，主/备切换）：
+**引擎**（仅 AI，无正则兜底）：
 ```
         ┌────────────────────────────────┐
-        │  RssService（业务部）            │
+        │  RssService（业务层）            │
         └───────────────┬────────────────┘
                         │ 依赖接口
         ┌───────────────▼────────────────┐
-        │  TitleParser / ItemFilter 接口  │
-        └───────┬──────────────┬─────────┘
-                ▼              ▼
-        ┌──────────────┐ ┌───────────────┐
-        │  AI 引擎      │ │  正则引擎(兜底) │
-        │ (云端LLM,    │ │  (免费快,      │
-        │  默认主用)    │ │   精确可测试)   │
-        └──────────────┘ └───────────────┘
+        │         TitleParser 接口        │
+        └───────────────┬────────────────┘
+                        ▼
+        ┌───────────────────────────────┐
+        │  AI 引擎（DeepSeek，OpenAI兼容） │
+        └───────────────────────────────┘
 ```
 
-- **AI 引擎**：调用云端大模型 API（OpenAI 兼容协议，支持 DeepSeek/通义/智谱等），默认开启
-- **正则引擎**：保留老项目正则作为兜底——AI 失败/超时/无 Key 时自动回退，保证不崩
-- **配置开关**：`aiEnabled`（默认 true）、`aiProvider`、`aiApiKey`、`aiBaseURL`、`aiModel`
+- **AI 引擎**：调用云端大模型 API（OpenAI 兼容协议，支持 DeepSeek/通义/智谱等），解析与规则筛选一步完成（`ai.Parse`）
+- ~~正则引擎兜底~~（已移除，提交 `fe2a1ed`；`aiEnabled=false` 或未配 Key 时不下载任何条目）
+- **配置开关**：`aiEnabled`（默认 true）、`aiProvider`、`aiApiKey`、`aiBaseURL`、`aiModel`、`aiSubtitleSC`
 
 设计要点：
 - **批量调用**：AI 一次处理多条标题，减少请求数、省成本、降延迟
-- **结果结构化**：AI 返回 JSON（集数/分辨率/字幕组），程序解析后复用老的重命名模板
-- **降级策略**：AI 出错 → 正则兜底 → 记录日志，不阻断下载主流程
-- 前端配置页加"AI 设置"区，含**测试按钮**（验证 Key/连通性）
+- **结果结构化**：AI 返回 JSON（集数/分辨率/字幕组/选版信号），程序解析后复用老的重命名模板
+- **失败退避**：某源连续 AI 解析失败达到阈值后进入退避期，期间跳过该源；不阻断其他订阅
+- **简中筛选**：`aiSubtitleSC` 开启时仅保留含简中字幕的资源
+- 前端配置页已实现"AI 设置"区与**测试按钮**（验证 Key/连通性）
 
 ## 6. 服务层（service）职责
 
@@ -261,8 +263,9 @@ type ItemFilter interface {
 |---|---|
 | `ConfigService` | 读/写/部分合并配置，应用默认值，写回 store |
 | `AniService` | 订阅 CRUD、列表分组（按季/周/拼音排序）、批量启停、导入导出 |
-| `RssService` | 聚合主+备用 RSS → 去重 → 过滤（match/exclude）→ 剧集提取 → 重命名；解析/过滤优先走 AI 引擎，失败回退正则 |
+| `RssService` | 聚合主+备用 RSS → 粗筛 → AI 解析+筛选（集号/规则/简中）→ 每集选最优版本 → 重命名 |
 | `DownloadService` | 下载主循环：登录→遍历订阅→解析RSS→查重→调网盘→缺集/摸鱼/完结检测→通知 |
+| `MetadataService` | 元数据编排：BGM/TMDB/番剧源 的搜索、详情、订阅反解析、封面下载 |
 | `NotifyService` | 遍历 notifier 分发，应用模板 |
 
 每个 service 用**构造函数注入**依赖（store / cloud / provider / 其他 service），例如：
@@ -290,9 +293,8 @@ type TaskManager struct {
 }
 func (t *TaskManager) Start() {
     t.ctx, t.cancel = context.WithCancel(context.Background())
-    t.wg.Add(2)
-    go t.runRSSLoop()   // 每 RssSleepMinutes 分钟
-    go t.runBgmLoop()   // 每 12 小时刷新评分
+    t.wg.Add(1)
+    go t.runRSSLoop()   // 每 RssSleepMinutes 分钟（runBgmLoop 未实现）
 }
 func (t *TaskManager) Stop() { t.cancel(); t.wg.Wait() }
 ```
@@ -300,34 +302,36 @@ func (t *TaskManager) Stop() { t.cancel(); t.wg.Wait() }
 - 每个循环内部用 `select { case <-ctx.Done(): return; case <-time.After(d): }`
 - 循环内每轮调用 service 时也透传 ctx，可被优雅中断
 - `DownloadService.DownloadAni` 内部串行下载，用 `ctx` 控制取消
+- ⚠️ 已知问题：`DownloadAni` 尚不感知 `ctx`，若下载进行中收到 SIGTERM，`Stop()` 会阻塞（未实现优雅中断）
 
 ## 8. HTTP 层（Gin）
 
 - `httpapi.Server` 持有所有 service 的引用（main 注入）
 - 路由用 Gin group，路径/契约**尽量保持与老项目一致**（前端迁移成本低）
-- 中间件：鉴权（`auth.CheckAuth`）、CORS、请求日志（slog）
+- 中间件：当前仅 `gin.Logger()` / `gin.Recovery()`
+- ⚠️ **鉴权未实现**：`auth.CheckAuth`（登录/令牌/IP 白名单）尚未落地，任意访问者都可读写配置（含 AI Key、115 Cookie）
 - handler 只做：绑定请求体 → 调 service → 包装 `model.Result{code,message,data,t}` 响应
-- 静态资源：`web/dist` 构建产物用 `embed` 嵌入，Gin `NoRoute` 兜底 SPA
+- 静态资源：`frontend/dist` 构建产物拷入 `internal/httpapi/static/` 用 `embed` 嵌入，Gin `NoRoute` 兜底 SPA
 
-## 9. 前端（React + TS，同仓 `web/`）
+## 9. 前端（React + TS，同仓 `frontend/`）
 
 ```
-web/
+frontend/
 ├── package.json
 ├── vite.config.ts
 ├── index.html
 └── src/
     ├── main.tsx
     ├── App.tsx
-    ├── api/            # REST 客户端封装（axios/fetch）
-    ├── pages/          # 首页/订阅/配置/日志/关于
-    ├── components/     # 通用组件
+    ├── api/            # REST 客户端封装（fetch）
+    ├── pages/          # 首页/番剧源/设置/日志
+    ├── components/     # 通用组件（SideMenu 等）
     ├── hooks/
     ├── types/          # TS 类型（对齐后端契约）
     └── store/          # 状态管理（zustand）
 ```
 
-- 状态管理：**React Query**（数据获取/缓存）+ **zustand**（全局状态），业界最佳实践组合
+- 数据获取：**React Query**（TanStack Query），全局状态 **zustand**
 - UI 组件库：**Ant Design**（中后台配置项多，组件丰富）
 - 构建产物拷入 `internal/httpapi/static/`，后端 `embed` 嵌入
 
@@ -337,14 +341,17 @@ web/
 
 ## 11. 里程碑（实现顺序）
 
-1. **M1 骨架**：domain 模型 + ports + JSON store + main 组装 + Gin 起服务 + `/api/ping`、`/api/config` 读
-2. **M2 配置**：ConfigService 完整（读写/合并/默认值/导出导入）
-3. **M3 订阅**：AniService + RssService（RSS 抓取/过滤/剧集/重命名）+ listAni/addAni/previewAni
-4. **M4 下载**：CloudDriver 接口 + driver_115 + DownloadService + 后台任务
-5. **M5 元数据**：bgm/tmdb/mikan provider
-6. **M6 通知**：Notifier 接口 + 各实现
-7. **M7 前端**：React 骨架 + 关键页面
-8. **M8 打磨**：日志/鉴权/测试
+1. **M1 骨架**：domain 模型 + ports + JSON store + main 组装 + Gin 起服务 + `/api/ping`、`/api/config` 读 ✅
+2. **M2 配置**：ConfigService 完整（读写/合并/默认值/导出导入）✅
+3. **M3 订阅**：AniService + RssService（RSS 抓取/过滤/剧集/重命名）+ listAni/addAni/previewAni ✅
+4. **M3.5 AI 引擎**：AI 解析+筛选端口（DeepSeek，OpenAI 兼容）✅
+5. **M4 下载**：CloudDriver 接口 + driver_115 + DownloadService + 后台任务 ✅
+6. **M5 元数据**：bgm/tmdb/animes.garden provider ✅（Mikan 未实现）
+7. **M6 通知**：Notifier 接口 + Telegram/Bark/ServerChan/WebHook/Shell/System ✅
+8. **M7 前端**：React 骨架 + 首页/番剧源/设置/日志页面 ✅
+9. **M8 打磨**：日志/前端体验 ✅；鉴权 ⚠️ 未实现；e2e 集成测试 ✅
+
+> 实际实现还包含：状态接口（`/api/status`）、日志页、115 扫码脚本、播放代理（`/api/file`）、订阅自动触发下载。
 
 ---
 
@@ -355,11 +362,11 @@ web/
 4. 元数据：全部 provider 接口化
 5. 通知：接口化多 notifier
 6. 并发：context + goroutine
-7. 前端：React + TS + Ant Design + React Query + zustand，同仓 `web/`
+7. 前端：React + TS + Ant Design + React Query + zustand，同仓 `frontend/`
 8. 存储：JSON 文件（契约兼容）
 9. DI：手动（main 组装）
+10. 番剧源：animes.garden 为主（Mikan/ani-bt 未实现）
 
 **开放问题**：
-1. API 端点是否 100% 保留（afdian/collection 已移除）
+1. 鉴权方案（当前无鉴权，见第 8 节 ⚠️）
 2. 是否需要老项目真实 json 样本做迁移测试
-3. 前端页面范围（先做哪些页）
