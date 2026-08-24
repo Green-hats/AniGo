@@ -57,28 +57,6 @@ type BgmEpisode struct {
 	DurationSeconds int    `json:"durationSeconds"`
 }
 
-// BgmMe 是已登录的 Bangumi 用户信息。
-type BgmMe struct {
-	Avatar      BgmAvatar `json:"avatar"`
-	ID          int       `json:"id"`
-	Sign        string    `json:"sign"`
-	URL         string    `json:"url"`
-	Username    string    `json:"username"`
-	Nickname    string    `json:"nickname"`
-	UserGroup   int       `json:"userGroup"`
-	RegTime     DateTime  `json:"regTime"`
-	Email       string    `json:"email"`
-	TimeOffset  int       `json:"timeOffset"`
-	ExpiresDays int       `json:"expiresDays"`
-}
-
-// BgmAvatar 是用户头像集合。
-type BgmAvatar struct {
-	Large  string `json:"large"`
-	Medium string `json:"medium"`
-	Small  string `json:"small"`
-}
-
 // MikanSeason 描述一个可选择的季度。
 type MikanSeason struct {
 	Year        int    `json:"year"`

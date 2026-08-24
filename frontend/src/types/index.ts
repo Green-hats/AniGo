@@ -92,10 +92,6 @@ export interface Config {
   ipWhitelistStr: string
   omit: boolean
   bgmToken: string
-  bgmAppID: string
-  bgmAppSecret: string
-  bgmRefreshToken: string
-  bgmRedirectUri: string
   apiKey: string
   downloadNew: boolean
   renameTemplate: string

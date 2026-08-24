@@ -9,111 +9,10 @@ import (
 	"github.com/greenhats/anigo/internal/domain"
 )
 
-// RegStr 是剧集提取正则（RenameUtil.REG_STR）。
-var RegStr = `(.*|\[.*])(( - |Vol |[Ee][Pp]?)\d+(\.5)?( ?\(\d+\))?|【\d+(\.5)?】|\[\d+(\.5)?( ?\(\d+\))?( ?[vV]\d)?( ?END)?( ?完)?( ?FIN)?]|第\d+(\.5)?[话話集]( - END)?|^\[TOC].* \d+|^六四位元字幕组.*★\d+(\.5)?★)`
-
 var (
-	regEp       = regexp.MustCompile(RegStr)
-	regNumber   = regexp.MustCompile(`\d+(\.5)?`)
-	regYear     = regexp.MustCompile(` ?\(((19|20)\d{2})\)`)
-	regRes      = regexp.MustCompile(`(720|1080|2160)[Pp]`)
-	regHashTail = regexp.MustCompile(`\[([A-Z]|\d){8}]$`)
+	regYear = regexp.MustCompile(` ?\(((19|20)\d{2})\)`)
+	regRes  = regexp.MustCompile(`(720|1080|2160)[Pp]`)
 )
-
-// Rename 提取剧集号并构造条目的 reName。
-// 无法解析出剧集号时返回 false（条目应被丢弃）。
-func Rename(ani *domain.Ani, item *domain.Item, cfg *domain.Config) bool {
-	offset := ani.Offset
-	season := ani.Season
-	title := ani.Title
-
-	if ani.Ova {
-		item.ReName = RenameDel(title, cfg)
-		return true
-	}
-
-	itemTitle := item.Title
-	itemTitle = strings.ReplaceAll(itemTitle, "+NCOPED", "")
-	itemTitle = strings.TrimSpace(itemTitle)
-	itemTitle = strings.ReplaceAll(itemTitle, "\n", " ")
-	itemTitle = strings.ReplaceAll(itemTitle, "\t", " ")
-	itemTitle = regHashTail.ReplaceAllString(itemTitle, "")
-	itemTitle = strings.TrimSpace(itemTitle)
-
-	var e string
-	if ani.CustomEpisode {
-		re, err := regexp.Compile(ani.CustomEpisodeStr)
-		if err == nil {
-			groups := re.FindStringSubmatch(itemTitle)
-			idx := ani.CustomEpisodeGroupIndex
-			if idx < len(groups) {
-				e = groups[idx]
-			}
-		}
-	} else {
-		groups := regEp.FindStringSubmatch(itemTitle)
-		if len(groups) > 2 {
-			e = groups[2]
-		}
-	}
-
-	if strings.TrimSpace(e) == "" {
-		return false
-	}
-
-	episodeStr := regNumber.FindString(e)
-	if episodeStr == "" {
-		return false
-	}
-
-	episodeF, err := strconv.ParseFloat(episodeStr, 64)
-	if err != nil {
-		return false
-	}
-	episode := episodeF + float64(offset)
-	item.Episode = episode
-
-	seasonFormat := fmt.Sprintf("%02d", season)
-	episodeFormat := fmt.Sprintf("%02d", int(episode))
-	episodeStrInt := strconv.Itoa(int(episode))
-
-	is5 := isHalf(episode)
-
-	if cfg.Skip5 && is5 {
-		return false
-	}
-
-	if is5 {
-		episodeFormat = episodeFormat + ".5"
-		episodeStrInt = episodeStrInt + ".5"
-	}
-
-	itemTitle = GetName(itemTitle)
-	resolution := GetResolution(itemTitle)
-
-	subgroup := item.Subgroup
-	if strings.TrimSpace(subgroup) == "" {
-		subgroup = "未知字幕组"
-	}
-
-	tmpl := GetRenameTemplate(ani, cfg)
-	tmpl = strings.ReplaceAll(tmpl, "${seasonFormat}", seasonFormat)
-	tmpl = strings.ReplaceAll(tmpl, "${episodeFormat}", episodeFormat)
-	tmpl = strings.ReplaceAll(tmpl, "${season}", strconv.Itoa(season))
-	tmpl = strings.ReplaceAll(tmpl, "${episode}", episodeStrInt)
-	tmpl = strings.ReplaceAll(tmpl, "${subgroup}", subgroup)
-	tmpl = strings.ReplaceAll(tmpl, "${itemTitle}", itemTitle)
-	tmpl = strings.ReplaceAll(tmpl, "${resolution}", resolution)
-	tmpl = strings.ReplaceAll(tmpl, "${title}", title)
-	tmpl = RenameDel(tmpl, cfg)
-
-	reName := GetName(tmpl)
-	if cfg.MaxFileNameLength > 0 && len([]rune(reName)) > cfg.MaxFileNameLength {
-		reName = string([]rune(reName)[:cfg.MaxFileNameLength])
-	}
-	item.ReName = reName
-	return true
-}
 
 // RenameWithEpisode 用给定的集号渲染重命名模板（跳过正则提取）。
 // episode 由外部（如 AI 解析）提供。无法解析时返回 false。
@@ -249,16 +148,4 @@ func RenameDel(title string, cfg *domain.Config) string {
 		title = regYear.ReplaceAllString(title, "")
 	}
 	return strings.TrimSpace(title)
-}
-
-// GetSubgroup 从首条括号条目提取字幕组。
-func GetSubgroup(items []*domain.Item) string {
-	reg := regexp.MustCompile(`^\[(.+?)]`)
-	for _, item := range items {
-		title := item.Title
-		if m := reg.FindStringSubmatch(title); len(m) > 1 {
-			return m[1]
-		}
-	}
-	return "未知字幕组"
 }

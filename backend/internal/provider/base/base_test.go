@@ -48,22 +48,3 @@ func TestFetcherGetHTTPError(t *testing.T) {
 		t.Fatalf("错误应包含状态码: %v", err)
 	}
 }
-
-func TestFetcherPostForm(t *testing.T) {
-	f := New(&fakeCfg{})
-	f.Req = func(ctx context.Context, method, rawURL string, body io.Reader, contentType string) ([]byte, int, error) {
-		if contentType != "application/x-www-form-urlencoded" {
-			t.Fatalf("contentType = %q", contentType)
-		}
-		return []byte(`{"ok":true}`), 200, nil
-	}
-	var v struct {
-		OK bool `json:"ok"`
-	}
-	if err := f.PostForm(context.Background(), "http://x", nil, &v); err != nil {
-		t.Fatalf("PostForm err: %v", err)
-	}
-	if !v.OK {
-		t.Fatal("PostForm 解析错误")
-	}
-}

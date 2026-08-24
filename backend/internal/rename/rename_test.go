@@ -10,43 +10,81 @@ func testConfig() *domain.Config {
 	return &domain.Config{Skip5: true}
 }
 
-// 回归: 剧集提取应支持 TSDM 等字幕组的常见命名([04] / [02v2] / 第3话)。
-func TestRenameEpisodeParsing(t *testing.T) {
+// 回归: RenameWithEpisode（AI 解析路径）应按给定集号渲染重命名模板。
+func TestRenameWithEpisodeFormats(t *testing.T) {
 	cfg := testConfig()
 	ani := &domain.Ani{Season: 1, Offset: 0, Ova: false, Title: "测试番剧", Subgroup: "TSDM字幕组"}
 	cases := []struct {
-		title string
-		ep    float64
-		ok    bool
+		ep   float64
+		want string
 	}{
-		{"【TSDM字幕组】[测试番剧][04][MKV][WebRip][H265-10bit 1080p AAC][简日内封字幕]", 4, true},
-		{"【TSDM字幕组】[测试番剧][02v2][MKV][WebRip]", 2, true},
-		{"【TSDM字幕组】[测试番剧][第3话][1080p]", 3, true},
-		{"【TSDM字幕组】[测试番剧][06][MP4][1080P]", 6, true},
-		{"【TSDM字幕组】[测试番剧][无集数字样]", 0, false},
+		{4, "测试番剧 S01E04"},
+		{12, "测试番剧 S01E12"},
 	}
 	for _, c := range cases {
-		it := &domain.Item{Title: c.title, ReName: c.title, Subgroup: "TSDM字幕组", Torrent: "magnet:?xt=urn:btih:abc"}
-		got := Rename(ani, it, cfg)
-		if got != c.ok {
-			t.Errorf("%s: Rename=%v, 期望 %v", c.title, got, c.ok)
+		it := &domain.Item{Title: "dummy", Subgroup: "TSDM字幕组", Torrent: "magnet:?xt=urn:btih:abc"}
+		if !RenameWithEpisode(ani, it, cfg, c.ep) {
+			t.Errorf("ep=%v: RenameWithEpisode 应成功", c.ep)
 			continue
 		}
-		if got && it.Episode != c.ep {
-			t.Errorf("%s: ep=%v, 期望 %v", c.title, it.Episode, c.ep)
+		if it.ReName != c.want {
+			t.Errorf("ep=%v: ReName = %q, want %q", c.ep, it.ReName, c.want)
+		}
+		if it.Episode != c.ep {
+			t.Errorf("ep=%v: Episode = %v", c.ep, it.Episode)
 		}
 	}
 }
 
-// 回归: Offset 偏移应叠加到解析出的集数上(用于补集数从1开始但源从N开始的情况)。
-func TestRenameOffsetApplied(t *testing.T) {
+// 回归: Offset 偏移应叠加到外部给定的集数上(用于补集数从1开始但源从N开始的情况)。
+func TestRenameWithEpisodeOffsetApplied(t *testing.T) {
 	cfg := testConfig()
 	ani := &domain.Ani{Season: 1, Offset: -1, Ova: false, Title: "测试番剧", Subgroup: "TSDM字幕组"}
-	it := &domain.Item{Title: "【TSDM字幕组】[测试番剧][02][MKV]", Subgroup: "TSDM字幕组", Torrent: "magnet:?xt=urn:btih:abc"}
-	if !Rename(ani, it, cfg) {
-		t.Fatal("Rename 应成功")
+	it := &domain.Item{Title: "dummy", Subgroup: "TSDM字幕组", Torrent: "magnet:?xt=urn:btih:abc"}
+	if !RenameWithEpisode(ani, it, cfg, 2) {
+		t.Fatal("RenameWithEpisode 应成功")
 	}
 	if it.Episode != 1 {
-		t.Errorf("offset=-1 时 [02] 应为 ep=1, 实际 %v", it.Episode)
+		t.Errorf("offset=-1 时给定 ep=2 应得 1, 实际 %v", it.Episode)
+	}
+	if it.ReName != "测试番剧 S01E01" {
+		t.Errorf("ReName = %q, want %q", it.ReName, "测试番剧 S01E01")
+	}
+}
+
+// 回归: 无集数(ep<=0)应返回 false（条目被丢弃）。
+func TestRenameWithEpisodeRejectsNoEpisode(t *testing.T) {
+	cfg := testConfig()
+	ani := &domain.Ani{Season: 1, Offset: 0, Ova: false, Title: "测试番剧", Subgroup: "TSDM字幕组"}
+	it := &domain.Item{Title: "dummy", Subgroup: "TSDM字幕组", Torrent: "magnet:?xt=urn:btih:abc"}
+	if RenameWithEpisode(ani, it, cfg, 0) {
+		t.Error("ep=0 应返回 false")
+	}
+}
+
+// 回归: OVA 直接用剧名渲染（不附加集号）。
+func TestRenameWithEpisodeOVA(t *testing.T) {
+	cfg := testConfig()
+	ani := &domain.Ani{Season: 1, Offset: 0, Ova: true, Title: "剧场版 测试", Subgroup: "TSDM字幕组"}
+	it := &domain.Item{Title: "dummy", Subgroup: "TSDM字幕组", Torrent: "magnet:?xt=urn:btih:abc"}
+	if !RenameWithEpisode(ani, it, cfg, 1) {
+		t.Fatal("OVA 应成功")
+	}
+	if it.ReName != "剧场版 测试" {
+		t.Errorf("ReName = %q, want %q", it.ReName, "剧场版 测试")
+	}
+}
+
+// RenameDel: 去除年份标记（RenameDelYear 开启时）。
+func TestRenameDel(t *testing.T) {
+	cfg := &domain.Config{RenameDelYear: true}
+	got := RenameDel("测试番剧 (2026)", cfg)
+	if got != "测试番剧" {
+		t.Errorf("RenameDel = %q, want %q", got, "测试番剧")
+	}
+	// 关闭时保留年份
+	cfg.RenameDelYear = false
+	if got := RenameDel("测试番剧 (2026)", cfg); got != "测试番剧 (2026)" {
+		t.Errorf("关闭时 RenameDel = %q", got)
 	}
 }

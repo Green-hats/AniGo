@@ -9,9 +9,7 @@ import (
 
 // 日志级别。
 const (
-	LevelDebug = "DEBUG"
 	LevelInfo  = "INFO"
-	LevelWarn  = "WARN"
 	LevelError = "ERROR"
 )
 
@@ -29,19 +27,6 @@ func New(cap int) *Logger {
 		cap = 256
 	}
 	return &Logger{ring: make([]domain.Log, 0, cap), max: cap}
-}
-
-// SetMax 调整环形缓冲容量。
-func (l *Logger) SetMax(n int) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if n <= 0 {
-		n = 256
-	}
-	l.max = n
-	if len(l.ring) > l.max {
-		l.ring = l.ring[len(l.ring)-l.max:]
-	}
 }
 
 // push 追加一条日志。
@@ -63,14 +48,8 @@ func (l *Logger) push(level, logger, msg string) {
 // Log 记录一条带级别的日志。
 func (l *Logger) Log(level, logger, msg string) { l.push(level, logger, msg) }
 
-// Debug 记录 DEBUG 级日志。
-func (l *Logger) Debug(logger, msg string) { l.push(LevelDebug, logger, msg) }
-
 // Info 记录 INFO 级日志。
 func (l *Logger) Info(logger, msg string) { l.push(LevelInfo, logger, msg) }
-
-// Warn 记录 WARN 级日志。
-func (l *Logger) Warn(logger, msg string) { l.push(LevelWarn, logger, msg) }
 
 // Error 记录 ERROR 级日志。
 func (l *Logger) Error(logger, msg string) { l.push(LevelError, logger, msg) }

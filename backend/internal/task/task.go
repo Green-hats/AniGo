@@ -58,12 +58,6 @@ func (t *TaskManager) Stop() {
 	}
 }
 
-// Restart 停止并重启（配置时间变化后调用）。
-func (t *TaskManager) Restart() {
-	t.Stop()
-	t.Start()
-}
-
 // runRSSLoop 每 N 分钟执行一轮下载同步。
 func (t *TaskManager) runRSSLoop() {
 	defer t.wg.Done()

@@ -20,6 +20,3 @@ func (s *LogService) List() []domain.Log { return s.logger.List() }
 
 // Clear 清空日志。
 func (s *LogService) Clear() { s.logger.Clear() }
-
-// Logger 返回底层 logger（供任务/下载/通知写入）。
-func (s *LogService) Logger() *log.Logger { return s.logger }

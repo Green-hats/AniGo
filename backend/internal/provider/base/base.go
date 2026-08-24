@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -109,40 +107,6 @@ func (f *Fetcher) GetRaw(ctx context.Context, rawURL string) ([]byte, error) {
 		return nil, &HTTPError{Status: code, Body: string(b)}
 	}
 	return b, nil
-}
-
-// PostForm 执行表单 POST 并解析 JSON 到 v。
-func (f *Fetcher) PostForm(ctx context.Context, rawURL string, form url.Values, v interface{}) error {
-	b, code, err := f.Req(ctx, "POST", rawURL, strings.NewReader(form.Encode()), "application/x-www-form-urlencoded")
-	if err != nil {
-		return err
-	}
-	if code < 200 || code >= 300 {
-		return &HTTPError{Status: code, Body: string(b)}
-	}
-	if v == nil {
-		return nil
-	}
-	return json.Unmarshal(b, v)
-}
-
-// PostJSON 执行 JSON POST 并解析响应到 v。
-func (f *Fetcher) PostJSON(ctx context.Context, rawURL string, payload interface{}, v interface{}) error {
-	b, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	body, code, err := f.Req(ctx, "POST", rawURL, strings.NewReader(string(b)), "application/json")
-	if err != nil {
-		return err
-	}
-	if code < 200 || code >= 300 {
-		return &HTTPError{Status: code, Body: string(body)}
-	}
-	if v == nil {
-		return nil
-	}
-	return json.Unmarshal(body, v)
 }
 
 // HTTPError 是 HTTP 非 2xx 响应错误。

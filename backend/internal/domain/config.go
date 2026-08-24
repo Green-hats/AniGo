@@ -135,12 +135,7 @@ type Config struct {
 	IpWhitelist                    bool                  `json:"ipWhitelist"`
 	IpWhitelistStr                 string                `json:"ipWhitelistStr"`
 	Omit                           bool                  `json:"omit"`
-	BgmTokenType                   string                `json:"bgmTokenType"`
 	BgmToken                       string                `json:"bgmToken"`
-	BgmAppID                       string                `json:"bgmAppID"`
-	BgmAppSecret                   string                `json:"bgmAppSecret"`
-	BgmRefreshToken                string                `json:"bgmRefreshToken"`
-	BgmRedirectUri                 string                `json:"bgmRedirectUri"`
 	ApiKey                         string                `json:"apiKey"`
 	DownloadNew                    bool                  `json:"downloadNew"`
 	RenameTemplate                 string                `json:"renameTemplate"`

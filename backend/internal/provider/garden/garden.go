@@ -112,15 +112,6 @@ func (g *Garden) Group(ctx context.Context, bgmID string) ([]*domain.AnimeGarden
 	return groups, nil
 }
 
-// BuildRSS 构造指定番剧+字幕组的 RSS 订阅 URL。
-func BuildRSS(subject, fansub string) string {
-	u := apiHost + "/feed.xml?subject=" + url.QueryEscape(subject)
-	if fansub != "" {
-		u += "&fansub=" + url.QueryEscape(fansub)
-	}
-	return u
-}
-
 // GetSubjectIdFromURL 从 animes.garden 链接提取番剧 id。
 func GetSubjectIdFromURL(rawURL string) string {
 	u, err := url.Parse(rawURL)

@@ -59,6 +59,3 @@ func sampleAni() *domain.Ani {
 		ReleaseDate:          domain.Date(time.Now()),
 	}
 }
-
-// Registry 返回通知器注册表（供配置页测试等）。
-func (s *NotifyService) Registry() *notifier.Registry { return s.registry }

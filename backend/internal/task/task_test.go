@@ -59,19 +59,6 @@ func TestStopBeforeStart(t *testing.T) {
 	}
 }
 
-func TestRestart(t *testing.T) {
-	tm := newTestTaskManager(t)
-	tm.Start()
-	if !tm.running {
-		t.Fatal("Start 失败")
-	}
-	tm.Restart()
-	if !tm.running {
-		t.Error("Restart 后 running 应为 true")
-	}
-	tm.Stop()
-}
-
 func TestStartStopCompletesWithinTimeout(t *testing.T) {
 	// 即使 Rss=true，Stop 也应通过 context 取消快速返回（不会等完整个 sleep interval）
 	tm := newTestTaskManager(t)
