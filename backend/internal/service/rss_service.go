@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/greenhats/anigo/internal/domain"
@@ -20,15 +21,32 @@ type RssService struct {
 	cfg    *ConfigService
 	ai     *ai.DeepSeek
 	logger *log.Logger
+
+	failMu    sync.Mutex
+	failCount map[string]int       // 每个源连续 AI 失败次数
+	failTime  map[string]time.Time // 每个源最近一次失败时间
 }
+
+// ai 连续失败退避参数：连续失败达到阈值后，在退避期内不再发起 AI 请求。
+const (
+	aiFailBackoffThreshold = 3
+	aiFailBackoffDuration  = 5 * time.Minute
+)
 
 // NewRssService 创建 RSS 服务。
 func NewRssService(cfg *ConfigService, logger *log.Logger) *RssService {
 	return &RssService{
-		cfg:    cfg,
-		ai:     ai.New(cfg.Get()),
-		logger: logger,
+		cfg:       cfg,
+		ai:        ai.New(cfg.Get()),
+		logger:    logger,
+		failCount: map[string]int{},
+		failTime:  map[string]time.Time{},
 	}
+}
+
+// aiKey 生成某源的失败状态 key。
+func aiKey(ani *domain.Ani, rssURL string) string {
+	return ani.ID + "|" + rssURL
 }
 
 // ReloadAI 在 AI 配置变更后重建客户端。
@@ -233,6 +251,20 @@ func langScore(l string) int {
 	return 1 // 有语言标记但非简繁
 }
 
+// hardFilterTitle 用固定硬规则判断标题是否应在进 AI 前粗筛剔除。
+// 只处理"明显不需要下载"的类型（多集合成/合集、明显 720p），
+// 与订阅的 match/exclude 规则无关（那些已交给 AI 判断）。
+func hardFilterTitle(title string) bool {
+	t := strings.ToLower(strings.TrimSpace(title))
+	if strings.Contains(t, "合集") || strings.Contains(t, "全集") || strings.Contains(t, "全卷") {
+		return true
+	}
+	if strings.Contains(t, "720p") {
+		return true
+	}
+	return false
+}
+
 // CurrentEpisodeNumber 计算当前集数（按集去重，修复多版本重复计数）。
 func (s *RssService) CurrentEpisodeNumber(ani *domain.Ani, items []*domain.Item) int {
 	cfg := s.cfg.Get()
@@ -280,6 +312,18 @@ func (s *RssService) getItems(ani *domain.Ani, rssURL, subgroupName string) []*d
 	}
 	items := rss.Parse(ani, rssURL, subgroupName, xmlBody)
 	s.logf("INFO", "rss", "%s rss解析到 %d 个原始条目", ani.Title, len(items))
+	// 进 AI 前用固定硬规则粗筛明显不需要的条目，减少 AI 处理量
+	pre := items[:0]
+	for _, it := range items {
+		if !hardFilterTitle(it.Title) {
+			pre = append(pre, it)
+		}
+	}
+	dropped := len(items) - len(pre)
+	items = pre
+	if dropped > 0 {
+		s.logf("INFO", "rss", "%s 粗筛剔除 %d 条", ani.Title, dropped)
+	}
 	if len(items) == 0 || s.ai == nil || !cfg.AiEnabled {
 		// 仅 AI 解析：无 AI 则无法确定集号
 		s.logf("WARN", "rss", "%s ai未启用, 无集号来源, 丢弃", ani.Title)
@@ -293,12 +337,19 @@ func (s *RssService) getItems(ani *domain.Ani, rssURL, subgroupName string) []*d
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
+	key := aiKey(ani, rssURL)
+	if s.aiInBackoff(key) {
+		s.logf("WARN", "rss", "%s ai连续失败, 暂缓解析, 跳过本轮", ani.Title)
+		return nil
+	}
 	parsed, err := s.ai.Parse(ctx, ani, titles)
 	if err != nil {
-		// AI 失败 → 无集号来源，丢弃
+		// AI 失败 → 无集号来源，丢弃；记录失败次数以触发退避
+		s.aiRecordFail(key)
 		s.logf("WARN", "rss", "%s ai解析失败: %v", ani.Title, err)
 		return nil
 	}
+	s.aiResetFail(key)
 	s.logf("INFO", "rss", "%s ai解析完成", ani.Title)
 	var refined []*domain.Item
 	for i, it := range items {
@@ -334,4 +385,34 @@ func (s *RssService) logf(level, logger, format string, args ...interface{}) {
 		return
 	}
 	s.logger.Log(level, logger, fmt.Sprintf(format, args...))
+}
+
+// aiInBackoff 判断某源是否处于 AI 失败退避期。
+func (s *RssService) aiInBackoff(key string) bool {
+	s.failMu.Lock()
+	defer s.failMu.Unlock()
+	if s.failCount[key] < aiFailBackoffThreshold {
+		return false
+	}
+	last, ok := s.failTime[key]
+	if !ok {
+		return false
+	}
+	return time.Since(last) < aiFailBackoffDuration
+}
+
+// aiRecordFail 记录一次 AI 失败（连续失败计数 + 时间）。
+func (s *RssService) aiRecordFail(key string) {
+	s.failMu.Lock()
+	defer s.failMu.Unlock()
+	s.failCount[key]++
+	s.failTime[key] = time.Now()
+}
+
+// aiResetFail 清空某源的失败计数（AI 解析成功时调用）。
+func (s *RssService) aiResetFail(key string) {
+	s.failMu.Lock()
+	defer s.failMu.Unlock()
+	delete(s.failCount, key)
+	delete(s.failTime, key)
 }

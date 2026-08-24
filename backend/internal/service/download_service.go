@@ -181,14 +181,6 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 			}
 		}
 
-		// 云端文件已存在
-		if exists, _ := driver.FileExists(context.Background(), cfg, savePath+"/"+reName); exists {
-			if item.Master && !is5 {
-				currentDownloadCount++
-			}
-			continue
-		}
-
 		if item.Master && !is5 {
 			currentDownloadCount++
 		}
