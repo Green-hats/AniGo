@@ -62,6 +62,45 @@ func TestRenameWithEpisodeRejectsNoEpisode(t *testing.T) {
 	}
 }
 
+// 回归: Skip5 时 x.5 特别篇应被跳过；关闭后应渲染为 S01E03.5。
+func TestRenameWithEpisodeSkipHalf(t *testing.T) {
+	cfg := testConfig()
+	ani := &domain.Ani{Season: 1, Offset: 0, Ova: false, Title: "测试番剧", Subgroup: "TSDM字幕组"}
+	it := &domain.Item{Title: "dummy", Subgroup: "TSDM字幕组", Torrent: "magnet:?xt=urn:btih:abc"}
+	if RenameWithEpisode(ani, it, cfg, 3.5) {
+		t.Error("Skip5=true 时 3.5 集应被跳过")
+	}
+	cfg.Skip5 = false
+	if !RenameWithEpisode(ani, it, cfg, 3.5) {
+		t.Fatal("Skip5=false 时 3.5 集应成功")
+	}
+	if it.ReName != "测试番剧 S01E03.5" {
+		t.Errorf("ReName = %q, want %q", it.ReName, "测试番剧 S01E03.5")
+	}
+}
+
+func TestIsHalf(t *testing.T) {
+	cases := []struct {
+		ep   float64
+		want bool
+	}{
+		{3.5, true},
+		{12.5, true},
+		{0.5, true},
+		{3, false},
+		{4.0, false},
+		{3.4999999, true}, // 容忍浮点误差
+		{3.5000001, true},
+		{3.999999, false}, // 接近下个整数，不是 .5
+		{2, false},
+	}
+	for _, c := range cases {
+		if got := isHalf(c.ep); got != c.want {
+			t.Errorf("isHalf(%v) = %v, want %v", c.ep, got, c.want)
+		}
+	}
+}
+
 // 回归: OVA 直接用剧名渲染（不附加集号）。
 func TestRenameWithEpisodeOVA(t *testing.T) {
 	cfg := testConfig()

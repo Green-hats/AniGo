@@ -2,6 +2,7 @@ package rename
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -89,7 +90,9 @@ func GetRenameTemplate(ani *domain.Ani, cfg *domain.Config) string {
 }
 
 func isHalf(ep float64) bool {
-	return int(ep) != int(ep+0.499999) && ep != float64(int(ep))
+	// 判断是否为 x.5 特别篇，容忍解析时的浮点误差（如 3.5000001）。
+	frac := ep - math.Floor(ep)
+	return math.Abs(frac-0.5) < 1e-6
 }
 
 // Is5 判断剧集号是否为 x.5 特别篇。
