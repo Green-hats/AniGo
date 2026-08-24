@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/greenhats/anigo/internal/domain"
+	"github.com/greenhats/anigo/internal/log"
 	"github.com/greenhats/anigo/internal/provider/ai"
 	"github.com/greenhats/anigo/internal/rename"
 	"github.com/greenhats/anigo/internal/rss"
@@ -15,15 +17,17 @@ import (
 // RssService 负责 RSS 聚合、过滤与去重。
 // 当 AI 启用并配置了 apiKey 时，用 AI 解析标题集数，失败回退正则。
 type RssService struct {
-	cfg *ConfigService
-	ai  *ai.DeepSeek
+	cfg    *ConfigService
+	ai     *ai.DeepSeek
+	logger *log.Logger
 }
 
 // NewRssService 创建 RSS 服务。
-func NewRssService(cfg *ConfigService) *RssService {
+func NewRssService(cfg *ConfigService, logger *log.Logger) *RssService {
 	return &RssService{
-		cfg: cfg,
-		ai:  ai.New(cfg.Get()),
+		cfg:    cfg,
+		ai:     ai.New(cfg.Get()),
+		logger: logger,
 	}
 }
 
@@ -57,7 +61,7 @@ func (s *RssService) GetItems(ani *domain.Ani) []*domain.Item {
 		subgroup = "未知字幕组"
 	}
 	var items []*domain.Item
-	for _, it := range getItems(cfg, s.ai, ani, ani.URL, subgroup) {
+	for _, it := range s.getItems(ani, ani.URL, subgroup) {
 		it.Master = true
 		items = append(items, it)
 	}
@@ -71,7 +75,7 @@ func (s *RssService) GetItems(ani *domain.Ani) []*domain.Item {
 			}
 			clone := ani.Clone()
 			clone.Offset = sr.Offset
-			for _, it := range getItems(cfg, s.ai, clone, sr.URL, subgroup) {
+			for _, it := range s.getItems(clone, sr.URL, subgroup) {
 				it.Master = false
 				items = append(items, it)
 			}
@@ -166,34 +170,43 @@ func (s *RssService) CurrentEpisodeNumber(ani *domain.Ani, items []*domain.Item)
 }
 
 // getItems 解析单个 RSS 源为条目（最新在前），过滤并重命名。
-// 先正则解析；若 AI 可用，再批量用 AI 精化集号。
-func getItems(cfg *domain.Config, aiclient *ai.DeepSeek, ani *domain.Ani, rssURL, subgroupName string) []*domain.Item {
+// 仅 AI 解析：先过滤出候选条目，再用 AI 批量重算集号并渲染 reName。
+// AI 未启用/不可用/失败时无法确定集号，返回空（不再回退正则）。
+func (s *RssService) getItems(ani *domain.Ani, rssURL, subgroupName string) []*domain.Item {
+	cfg := s.cfg.Get()
+	s.logf("INFO", "rss", "%s rss开始刷新 (%s)", ani.Title, rssURL)
 	xmlBody, err := rss.GetRSS(cfg, rssURL)
 	if err != nil {
+		s.logf("WARN", "rss", "%s rss获取失败: %v", ani.Title, err)
 		return nil
 	}
 	items := rss.Parse(cfg, ani, rssURL, subgroupName, xmlBody)
-	if len(items) == 0 || aiclient == nil || !cfg.AiEnabled {
-		return items
+	s.logf("INFO", "rss", "%s rss解析到 %d 个原始条目", ani.Title, len(items))
+	if len(items) == 0 || s.ai == nil || !cfg.AiEnabled {
+		// 仅 AI 解析：无 AI 则无法确定集号
+		s.logf("WARN", "rss", "%s ai未启用, 无集号来源, 丢弃", ani.Title)
+		return nil
 	}
 	// 批量 AI 解析：提取每个条目的原始标题，让 AI 重算集号
+	s.logf("INFO", "rss", "%s ai开始解析 (%d 条)", ani.Title, len(items))
 	titles := make([]string, len(items))
 	for i, it := range items {
 		titles[i] = it.Title
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	parsed, err := aiclient.Parse(ctx, titles)
+	parsed, err := s.ai.Parse(ctx, titles)
 	if err != nil {
-		// AI 失败 → 回退正则结果
-		return items
+		// AI 失败 → 无集号来源，丢弃
+		s.logf("WARN", "rss", "%s ai解析失败: %v", ani.Title, err)
+		return nil
 	}
+	s.logf("INFO", "rss", "%s ai解析完成", ani.Title)
 	var refined []*domain.Item
 	for i, it := range items {
 		pt := parsed[i]
 		if pt.Episode <= 0 {
-			// AI 无法判断该条 → 回退正则解析结果，不丢弃
-			refined = append(refined, it)
+			// AI 无法判断该条 → 丢弃
 			continue
 		}
 		clone := it.Clone()
@@ -204,14 +217,17 @@ func getItems(cfg *domain.Config, aiclient *ai.DeepSeek, ani *domain.Ani, rssURL
 			refined = append(refined, clone)
 		}
 	}
-	if len(refined) > 0 {
-		return filterByAI(cfg, aiclient, ani, refined)
+	if len(refined) == 0 {
+		return nil
 	}
-	return items
+	refined = s.filterByAI(cfg, ani, refined)
+	refined = rss.DistinctByEpisode(refined)
+	s.logf("INFO", "rss", "%s rss结束刷新, 共 %d 个条目", ani.Title, len(refined))
+	return refined
 }
 
 // filterByAI 用 AI 筛选器剔除不符合订阅规则的条目（尽力而为，失败不阻断）。
-func filterByAI(cfg *domain.Config, aiclient *ai.DeepSeek, ani *domain.Ani, items []*domain.Item) []*domain.Item {
+func (s *RssService) filterByAI(cfg *domain.Config, ani *domain.Ani, items []*domain.Item) []*domain.Item {
 	// 无匹配/排除规则时无需 AI 筛选
 	if len(ani.Match) == 0 && len(ani.Exclude) == 0 {
 		return items
@@ -222,7 +238,7 @@ func filterByAI(cfg *domain.Config, aiclient *ai.DeepSeek, ani *domain.Ani, item
 	for i, it := range items {
 		titles[i] = it.Title
 	}
-	keep, err := aiclient.Filter(ctx, ani, titles)
+	keep, err := s.ai.Filter(ctx, ani, titles)
 	if err != nil {
 		return items // AI 筛选失败 → 全部保留
 	}
@@ -236,4 +252,12 @@ func filterByAI(cfg *domain.Config, aiclient *ai.DeepSeek, ani *domain.Ani, item
 		return items // 避免全删，回退
 	}
 	return out
+}
+
+// logf 写入 RSS 日志（logger 未注入时静默跳过）。
+func (s *RssService) logf(level, logger, format string, args ...interface{}) {
+	if s.logger == nil {
+		return
+	}
+	s.logger.Log(level, logger, fmt.Sprintf(format, args...))
 }

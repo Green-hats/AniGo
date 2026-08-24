@@ -38,7 +38,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "加载配置失败:", err)
 		os.Exit(1)
 	}
-	rssService := service.NewRssService(cfgService)
+	rssService := service.NewRssService(cfgService, logger)
 	metaService := service.NewMetadataService(cfgService, cache)
 	notifyService := service.NewNotifyService(cfgService, func(msg string) {
 		logger.Info("notification", msg)

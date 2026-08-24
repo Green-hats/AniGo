@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/greenhats/anigo/internal/domain"
-	"github.com/greenhats/anigo/internal/rename"
 	"github.com/greenhats/anigo/internal/util"
 )
 
@@ -101,8 +100,9 @@ func normalizeURL(rawURL string) string {
 	return rawURL
 }
 
-// Parse 解析 RSS XML 为条目，应用过滤与重命名。
-// cfg 用于全局排除规则与 Skip5 等。
+// Parse 解析 RSS XML 为条目，应用 exclude/match/global 过滤。
+// 不做正则提取集号：Episode 保持 0，集号与重命名由调用方
+// （AI 解析 + RenameWithEpisode）在取得集号后完成。
 func Parse(cfg *domain.Config, ani *domain.Ani, rssURL, subgroupName, body string) []*domain.Item {
 	var doc rssDocument
 	if err := xml.Unmarshal([]byte(body), &doc); err != nil {
@@ -250,14 +250,7 @@ func Parse(cfg *domain.Config, ani *domain.Ani, rssURL, subgroupName, body strin
 		items = append(items, it)
 	}
 
-	var filtered []*domain.Item
-	for _, it := range items {
-		if rename.Rename(ani, it, cfg) {
-			filtered = append(filtered, it)
-		}
-	}
-	filtered = distinctByEpisodeKeepLast(filtered)
-	return filtered
+	return items
 }
 
 // DistinctItems 按剧集或 reName 去重。
@@ -278,6 +271,12 @@ func DistinctItems(items []*domain.Item, coexist bool) []*domain.Item {
 		out = append(out, it)
 	}
 	return out
+}
+
+// DistinctByEpisode 按剧集去重（保留每集最后一条）。
+// 供调用方在取得集号（AI 解析）后去重使用。
+func DistinctByEpisode(items []*domain.Item) []*domain.Item {
+	return distinctByEpisodeKeepLast(items)
 }
 
 func distinctByEpisodeKeepLast(items []*domain.Item) []*domain.Item {
