@@ -165,7 +165,7 @@ M1 骨架 → M2 配置 → M3 订阅+RSS → M3.5 AI引擎 → M4 下载核心 
 - **可测试**：HTTP 请求函数可注入，单测不依赖网络
 - **契约兼容**：`config.v2.json` / `ani.v2.json` 格式与上游一致，可迁移
 
-详见 [`docs/architecture.md`](docs/architecture.md) 与 [`docs/breakdown.md`](docs/breakdown.md)。
+详见 [`docs/architecture.md`](docs/architecture.md) 与 [`docs/pipeline.md`](docs/pipeline.md)。
 
 ## 免责声明
 

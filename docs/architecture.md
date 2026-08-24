@@ -178,7 +178,7 @@ type FansubSource interface {
   - `GET /subjects` — 番剧周列表（首页番剧源浏览）
   - `GET /detail/{provider}/{id}` — 资源详情
 - 已实现：`provider/garden` 提供 `ListSubjects` / `Group` / `BuildRSS` / `GetSubjectIdFromURL`
-- ~~备选源 Mikan / ani-bt~~（未实现，Mikan 的移植参考见 `docs/m5-reference.md`）
+- ~~备选源 Mikan / ani-bt~~（未实现）
 
 BGM 特有能力（评分/剧集标题）直接调用 `provider/bgm`；OAuth 代码在 provider 中实现但**未接入 HTTP 层**（未实现）。
 
