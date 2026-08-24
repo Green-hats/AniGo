@@ -93,13 +93,19 @@ func (s *DownloadService) SyncDownload(list []*domain.Ani) {
 		if ani == nil || !ani.Enable {
 			continue
 		}
-		s.DownloadAni(ani)
+		s.downloadAni(ani, false)
 		time.Sleep(500 * time.Millisecond)
 	}
 }
 
-// DownloadAni 是每个订阅的下载主流程。
+// DownloadAni 是每个订阅的下载主流程（公共入口，带登录检查）。
 func (s *DownloadService) DownloadAni(ani *domain.Ani) {
+	s.downloadAni(ani, true)
+}
+
+// downloadAni 是 DownloadAni 的内部实现。
+// checkLogin 为 true 时先验证网盘登录，Cookie 失效直接返回，避免盲目提交失败任务。
+func (s *DownloadService) downloadAni(ani *domain.Ani, checkLogin bool) {
 	downloadMutex <- struct{}{}
 	defer func() { <-downloadMutex }()
 	defer func() {
@@ -109,6 +115,18 @@ func (s *DownloadService) DownloadAni(ani *domain.Ani) {
 	}()
 
 	cfg := s.cfg.Get()
+	if checkLogin {
+		if ok, _ := s.Driver().Login(context.Background(), true, cfg); !ok {
+			st := s.Driver().GetLoginStatus()
+			msg := st.Message
+			if msg == "" {
+				msg = "未知原因"
+			}
+			s.logf("WARN", "download", "%s 下载客户端登录失败, 跳过: %s", ani.Title, msg)
+			return
+		}
+	}
+
 	items := s.rss.GetItems(ani)
 	s.logf("INFO", "download", "%s 刷新完成, 共 %d 个条目", ani.Title, len(items))
 	s.RssOmit(ani, items)
