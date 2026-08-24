@@ -70,7 +70,7 @@ export default function HomePage() {
                         {ani.score > 0 && <Tag color="gold">{ani.score.toFixed(1)}</Tag>}
                       </div>
                       <Text type="secondary" style={{ fontSize: 12 }}>
-                        已下载 {ani.downloadedEps || ani.currentEpisodeNumber} / 更新 {ani.currentEpisodeNumber || '?'} / 共 {ani.totalEpisodeNumber || '?'} 集
+                        已下载 {ani.downloadedEps || ani.currentEpisodeNumber} / 更新 {ani.bgmAiredEps || ani.totalEpisodeNumber || '?'} / 共 {ani.totalEpisodeNumber || '?'} 集
                         {ani.subgroup && ` · ${ani.subgroup}`}
                       </Text>
                     </div>
