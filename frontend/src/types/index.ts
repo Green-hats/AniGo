@@ -139,7 +139,7 @@ export interface Config {
   aiApiKey: string
   aiBaseURL: string
   aiModel: string
-  aiPrompt: string
+  aiSubtitleSC: boolean
 }
 
 export interface Ani {

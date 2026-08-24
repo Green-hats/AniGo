@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Tabs, Form, Input, Switch, InputNumber, Button, Divider, message, Space, Select, Typography, Alert } from 'antd'
+import { Tabs, Form, Input, Switch, InputNumber, Button, Divider, message, Space, Select } from 'antd'
 import { api } from '../api/client'
 import type { Config } from '../types'
 
@@ -82,6 +82,14 @@ export default function SettingsPage() {
               <Form.Item label="启用 AI" name="aiEnabled" valuePropName="checked">
                 <Switch />
               </Form.Item>
+              <Form.Item
+                label="仅简体中文字幕"
+                name="aiSubtitleSC"
+                valuePropName="checked"
+                extra="AI 筛选时仅保留含简体中文字幕的资源（简中或简中双语视为满足）。"
+              >
+                <Switch />
+              </Form.Item>
               <Form.Item label="AI 提供方" name="aiProvider">
                 <Select
                   options={[
@@ -100,23 +108,6 @@ export default function SettingsPage() {
               </Form.Item>
               <Form.Item label="模型" name="aiModel">
                 <Input placeholder="deepseek-v4-flash" />
-              </Form.Item>
-              <Divider />
-              <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-                AI 标题解析要求（可自定义）
-              </Typography.Text>
-              <Alert
-                type="info"
-                showIcon
-                style={{ marginBottom: 8 }}
-                message="输入输出格式为固定内容（角色描述与 JSON 格式），只有中间的「要求」部分可编辑。"
-              />
-              <Form.Item
-                name="aiPrompt"
-                label="解析要求"
-                extra="将插入提示词中间。输入输出格式固定不变，请勿修改 JSON 字段名。"
-              >
-                <Input.TextArea rows={6} />
               </Form.Item>
               <Space>
                 <Button onClick={handleAIPing}>测试 AI 连通</Button>
