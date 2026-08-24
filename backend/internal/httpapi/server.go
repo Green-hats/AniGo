@@ -21,10 +21,11 @@ type Server struct {
 	meta     *service.MetadataService
 	notify   *service.NotifyService
 	logs     *service.LogService
+	status   *service.StatusService
 }
 
 // NewServer 构建注册了所有路由的 Gin 引擎。
-func NewServer(cfg *service.ConfigService, ani *service.AniService, rss *service.RssService, download *service.DownloadService, meta *service.MetadataService, notify *service.NotifyService, logs *service.LogService) *Server {
+func NewServer(cfg *service.ConfigService, ani *service.AniService, rss *service.RssService, download *service.DownloadService, meta *service.MetadataService, notify *service.NotifyService, logs *service.LogService, status *service.StatusService) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	s := &Server{
 		engine:   gin.New(),
@@ -35,6 +36,7 @@ func NewServer(cfg *service.ConfigService, ani *service.AniService, rss *service
 		meta:     meta,
 		notify:   notify,
 		logs:     logs,
+		status:   status,
 	}
 	s.register()
 	return s
@@ -94,6 +96,9 @@ func (s *Server) register() {
 	// 日志
 	r.POST("/api/logs", s.handleLogs)
 	r.POST("/api/clearLogs", s.handleClearLogs)
+
+	// 状态
+	r.POST("/api/status", s.handleStatus)
 
 	// 前端静态资源（SPA 兜底）
 	r.NoRoute(staticFileServer())

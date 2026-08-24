@@ -234,6 +234,9 @@ func fillConfigDefaults(c, def *domain.Config, present map[string]bool) {
 	if !present["aiModel"] {
 		c.AiModel = def.AiModel
 	}
+	if !present["aiPrompt"] {
+		c.AiPrompt = def.AiPrompt
+	}
 	// 列表始终序列化为 []（前端依赖 .length/.push）
 	if c.Exclude == nil {
 		c.Exclude = []string{}

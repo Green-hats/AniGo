@@ -139,6 +139,7 @@ export interface Config {
   aiApiKey: string
   aiBaseURL: string
   aiModel: string
+  aiPrompt: string
 }
 
 export interface Ani {
@@ -266,4 +267,12 @@ export interface LogEntry {
   level: string
   loggerName: string
   threadName: string
+}
+
+export interface ServiceStatus {
+  ai: { configured: boolean; ok: boolean; reply: string; message: string }
+  cloud: { configured: boolean; loginOK: boolean; message: string }
+  memory: { allocMB: number; totalAllocMB: number; sysMB: number; numGC: number }
+  cache: { count: number; bytes: number; sizeKB: number }
+  uptimeSeconds: number
 }

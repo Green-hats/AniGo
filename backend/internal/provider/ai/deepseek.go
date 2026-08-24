@@ -106,18 +106,21 @@ func (d *DeepSeek) Ping(ctx context.Context) (string, error) {
 	return d.completeFn(ctx, "你是一个连通性测试助手", "请回复：ok")
 }
 
-// parseSystemPrompt 指导模型把标题解析为 JSON 数组。
-const parseSystemPrompt = `你是一个动漫BT资源标题解析器。用户会给你一批动漫下载资源标题，请把每个标题解析为结构化信息。
-
-规则：
-1. 从标题中提取集数（episode）。可能是 "S01E03"、"第03话"、"03"、"Vol.3"、"EP3" 等格式，也可能是 "[03]" 或 "03" 的特别篇（如 3.5、06.5）。
-2. 提取分辨率（resolution）：1080P、720P、2160P 等；没有则返回 "none"。
-3. 提取字幕组（subgroup）：通常是标题开头的方括号内容，如 [ANi]、[喵萌奶茶屋]；没有则返回 ""。
-4. 提取剧名（title）：去掉字幕组、集数、分辨率、编码等信息后的纯剧名。
-5. 如果某个标题无法判断集数，episode 返回 0，isSpecial 返回 false。
-
-只输出 JSON，不要任何其他文字。格式如下（数组，顺序与输入一致）：
-[{"rawTitle":"原样返回标题","episode":3,"resolution":"1080P","subgroup":"ANi","title":"间谍过家家","isSpecial":false}]`
+// parseSystemPrompt 组装标题解析提示词。
+// 结构：固定角色描述 + 可编辑要求（cfg.AiPrompt）+ 固定输入输出格式。
+// 输入输出格式部分不可由用户修改，只允许编辑中间的"要求"。
+func (d *DeepSeek) parseSystemPrompt() string {
+	rules := ""
+	if d.cfg != nil && strings.TrimSpace(d.cfg.AiPrompt) != "" {
+		rules = strings.TrimSpace(d.cfg.AiPrompt)
+	} else {
+		rules = domain.DEFAULT_AI_PROMPT()
+	}
+	return "你是一个动漫BT资源标题解析器。用户会给你一批动漫下载资源标题，请把每个标题解析为结构化信息。\n\n" +
+		rules + "\n\n" +
+		"只输出 JSON，不要任何其他文字。格式如下（数组，顺序与输入一致）：\n" +
+		`[{"rawTitle":"原样返回标题","episode":3,"resolution":"1080P","subgroup":"ANi","title":"间谍过家家","isSpecial":false}]`
+}
 
 // Parse 批量解析标题（TitleParser 接口实现）。
 func (d *DeepSeek) Parse(ctx context.Context, titles []string) ([]domain.ParsedTitle, error) {
@@ -125,7 +128,7 @@ func (d *DeepSeek) Parse(ctx context.Context, titles []string) ([]domain.ParsedT
 		return []domain.ParsedTitle{}, nil
 	}
 	user, _ := json.Marshal(titles)
-	raw, err := d.completeFn(ctx, parseSystemPrompt, string(user))
+	raw, err := d.completeFn(ctx, d.parseSystemPrompt(), string(user))
 	if err != nil {
 		return nil, err
 	}

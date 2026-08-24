@@ -5,6 +5,7 @@ import {
   RocketOutlined,
   SettingOutlined,
   FileTextOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -34,6 +35,7 @@ export default function SideMenu() {
         items={[
           { key: '/home', icon: <HomeOutlined />, label: '我的订阅' },
           { key: '/garden', icon: <RocketOutlined />, label: '番剧源' },
+          { key: '/test', icon: <ExperimentOutlined />, label: '服务测试' },
           { key: '/logs', icon: <FileTextOutlined />, label: '日志' },
           { key: '/settings', icon: <SettingOutlined />, label: '设置' },
         ]}

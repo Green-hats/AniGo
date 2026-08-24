@@ -187,6 +187,7 @@ type Config struct {
 	AiApiKey    string `json:"aiApiKey"`
 	AiBaseURL   string `json:"aiBaseURL"`
 	AiModel     string `json:"aiModel"`
+	AiPrompt    string `json:"aiPrompt"`
 }
 
 // renameRegStr 是遗留的剧集提取正则，保留作为 customEpisodeStr 的默认值以兼容配置。
@@ -194,6 +195,18 @@ const renameRegStr = `(.*|\[.*])(( - |Vol |[Ee][Pp]?)\d+(\.5)?( ?\(\d+\))?|【\d
 
 // RENAME_REG_STR 暴露剧集提取正则源码。
 func RENAME_REG_STR() string { return renameRegStr }
+
+// defaultAiPrompt 是 AI 标题解析的可编辑"要求"部分默认值。
+// 由 provider 拼接到固定格式提示词的中间（输入输出格式不可变）。
+const defaultAiPrompt = `规则：
+1. 从标题中提取集数（episode）。可能是 "S01E03"、"第03话"、"03"、"Vol.3"、"EP3" 等格式，也可能是 "[03]" 或 "03" 的特别篇（如 3.5、06.5）。
+2. 提取分辨率（resolution）：1080P、720P、2160P 等；没有则返回 "none"。
+3. 提取字幕组（subgroup）：通常是标题开头的方括号内容，如 [ANi]、[喵萌奶茶屋]；没有则返回 ""。
+4. 提取剧名（title）：去掉字幕组、集数、分辨率、编码等信息后的纯剧名。
+5. 如果某个标题无法判断集数，episode 返回 0，isSpecial 返回 false。`
+
+// DEFAULT_AI_PROMPT 暴露默认 AI 要求。
+func DEFAULT_AI_PROMPT() string { return defaultAiPrompt }
 
 // DefaultConfig 返回与遗留 ConfigUtil 静态块一致的默认配置。
 func DefaultConfig() *Config {
@@ -235,6 +248,7 @@ func DefaultConfig() *Config {
 		AiApiKey:                    defaultAiApiKey(),
 		AiBaseURL:                   "https://api.deepseek.com",
 		AiModel:                     "deepseek-v4-flash",
+		AiPrompt:                    defaultAiPrompt,
 	}
 }
 

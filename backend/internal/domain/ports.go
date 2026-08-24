@@ -24,6 +24,8 @@ type Cache interface {
 	Put(key, val string, ttl time.Duration)
 	Contains(key string) bool
 	Clear()
+	// Size 返回条目数与占用的字节数。
+	Size() (count, bytes int)
 }
 
 // ParsedTitle 是 AI 批量解析后返回的结构化标题信息。

@@ -45,13 +45,14 @@ func main() {
 	aniService := service.NewAniService(cfgService, rssService, metaService)
 	cloudReg := cloud.NewRegistry()
 	downloadService := service.NewDownloadService(cfgService, rssService, cloudReg, cache, metaService, notifyService, logger)
+	statusService := service.NewStatusService(cfgService, rssService, downloadService, cache)
 
 	// 3. 后台任务
 	taskMgr := task.NewTaskManager(cfgService, downloadService, logger)
 	taskMgr.Start()
 
 	// 4. HTTP 层
-	srv := httpapi.NewServer(cfgService, aniService, rssService, downloadService, metaService, notifyService, logService)
+	srv := httpapi.NewServer(cfgService, aniService, rssService, downloadService, metaService, notifyService, logService, statusService)
 
 	port := os.Getenv("PORT")
 	if port == "" {

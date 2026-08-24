@@ -58,4 +58,20 @@ func (c *TTLCache) Clear() {
 	c.m = map[string]cacheEntry{}
 }
 
+// Size 返回条目数与占用的字节数（未过期的）。
+func (c *TTLCache) Size() (count, bytes int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	for k, e := range c.m {
+		if now.After(e.expiry) {
+			delete(c.m, k)
+			continue
+		}
+		count++
+		bytes += len(k) + len(e.value)
+	}
+	return count, bytes
+}
+
 var _ domain.Cache = (*TTLCache)(nil)

@@ -19,3 +19,8 @@ func (s *Server) handleClearLogs(c *gin.Context) {
 	s.logs.Clear()
 	okMsg(c, "已清空日志")
 }
+
+// handleStatus 返回服务状态（AI/115 连接、内存、缓存）。
+func (s *Server) handleStatus(c *gin.Context) {
+	ok(c, s.status.Get(c.Request.Context()))
+}

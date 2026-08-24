@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage'
 import GardenPage from './pages/GardenPage'
 import SettingsPage from './pages/SettingsPage'
 import LogsPage from './pages/LogsPage'
+import TestPage from './pages/TestPage'
 
 const { Content } = Layout
 
@@ -21,6 +22,7 @@ export default function App() {
               <Route path="/garden" element={<GardenPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/logs" element={<LogsPage />} />
+              <Route path="/test" element={<TestPage />} />
             </Routes>
           </Content>
         </Layout>

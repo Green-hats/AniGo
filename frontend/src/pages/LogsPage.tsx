@@ -8,6 +8,10 @@ import {
   Space,
   Segmented,
   App,
+  Card,
+  Row,
+  Col,
+  Statistic,
 } from 'antd'
 import { ReloadOutlined, ClearOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -29,6 +33,11 @@ export default function LogsPage() {
     queryKey: ['logs'],
     queryFn: api.getLogs,
     refetchInterval: 3000, // 每 3 秒自动刷新
+  })
+  const { data: status } = useQuery({
+    queryKey: ['status'],
+    queryFn: api.getStatus,
+    refetchInterval: 3000,
   })
 
   // 级别筛选
@@ -64,11 +73,54 @@ export default function LogsPage() {
     },
   ]
 
+  const uptime = status?.uptimeSeconds ?? 0
+  const uptimeStr = `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`
+
   return (
     <div>
+      {/* 状态卡片 */}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col xs={12} sm={8} md={6}>
+          <Card size="small">
+            <Statistic
+              title="AI 服务"
+              value={status?.ai.ok ? '已连接' : status?.ai.configured ? '连接失败' : '未配置'}
+              valueStyle={{ color: status?.ai.ok ? '#52c41a' : status?.ai.configured ? '#ff4d4f' : '#999' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} md={6}>
+          <Card size="small">
+            <Statistic
+              title="115 网盘"
+              value={status?.cloud.loginOK ? '已连接' : status?.cloud.configured ? '登录失败' : '未配置'}
+              valueStyle={{ color: status?.cloud.loginOK ? '#52c41a' : status?.cloud.configured ? '#ff4d4f' : '#999' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} md={6}>
+          <Card size="small">
+            <Statistic
+              title="内存占用"
+              value={status?.memory.allocMB.toFixed(1) ?? '-'}
+              suffix="MB"
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} md={6}>
+          <Card size="small">
+            <Statistic
+              title="缓存占用"
+              value={status?.cache.count ?? 0}
+              suffix={`条 / ${status?.cache.sizeKB.toFixed(0) ?? 0}KB`}
+            />
+          </Card>
+        </Col>
+      </Row>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Typography.Title level={4} style={{ margin: 0 }}>
-          日志
+          日志 (运行 {uptimeStr})
         </Typography.Title>
         <Space>
           <Segmented

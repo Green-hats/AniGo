@@ -74,4 +74,7 @@ export const api = {
   // 日志
   getLogs: () => request<import('../types').LogEntry[]>('POST', '/api/logs'),
   clearLogs: () => request<null>('POST', '/api/clearLogs'),
+
+  // 状态
+  getStatus: () => request<import('../types').ServiceStatus>('POST', '/api/status'),
 }
