@@ -220,6 +220,18 @@ export default function SettingsPage() {
     }
   }
 
+  const handleSecuritySave = async (values: { username: string; password?: string }) => {
+    setSaving(true)
+    try {
+      await api.setConfig({ login: { username: values.username, password: values.password ?? '' } })
+      message.success('已保存')
+    } catch (e) {
+      message.error(`保存失败: ${(e as Error).message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const notificationList = Form.useWatch('notificationConfigList', form) ?? []
 
   return (
@@ -451,6 +463,50 @@ export default function SettingsPage() {
               </Form.List>
               <Divider />
               <Button type="primary" onClick={handleSave} loading={saving}>
+                保存
+              </Button>
+            </Form>
+          ),
+        },
+      {
+          key: 'security',
+          label: '安全',
+          children: (
+            <Form
+              layout="vertical"
+              style={{ maxWidth: 600 }}
+              onFinish={handleSecuritySave}
+              initialValues={{ username: cfg?.login?.username }}
+            >
+              <Form.Item
+                label="登录用户名"
+                name="username"
+                rules={[{ required: true, message: '请输入用户名' }]}
+              >
+                <Input placeholder="admin" />
+              </Form.Item>
+              <Form.Item label="新密码" name="password" extra="留空则不修改密码">
+                <Input.Password autoComplete="new-password" />
+              </Form.Item>
+              <Form.Item
+                label="确认新密码"
+                name="confirm"
+                dependencies={['password']}
+                rules={[
+                  ({ getFieldValue }) => ({
+                    validator: (_, value) =>
+                      !value || value === getFieldValue('password')
+                        ? Promise.resolve()
+                        : Promise.reject(new Error('两次输入的密码不一致')),
+                  }),
+                ]}
+              >
+                <Input.Password autoComplete="new-password" />
+              </Form.Item>
+              <Form.Item label="登录有效期（小时）" name="loginEffectiveHours" extra="会话有效期，默认 3 小时。">
+                <InputNumber min={1} max={720} style={{ width: '100%' }} />
+              </Form.Item>
+              <Button type="primary" htmlType="submit" loading={saving}>
                 保存
               </Button>
             </Form>

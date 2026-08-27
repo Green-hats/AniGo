@@ -84,6 +84,11 @@ func NewError(msg string) *Result {
 	return &Result{Code: 500, Message: msg, T: NowMillis()}
 }
 
+// NewCodeError 构建指定 code 的错误结果。
+func NewCodeError(code int, msg string) *Result {
+	return &Result{Code: code, Message: msg, T: NowMillis()}
+}
+
 // NewMessage 构建带自定义消息的成功结果。
 func NewMessage(msg string) *Result {
 	return &Result{Code: 200, Message: msg, T: NowMillis()}

@@ -6,10 +6,37 @@ const BASE = ''
 // 默认请求超时（毫秒），避免后端接口卡住时 UI 无限等待。
 const DEFAULT_TIMEOUT = 30_000
 
+// localStorage 中保存登录 token 的键名。
+const TOKEN_KEY = 'anigo_token'
+
+export function getToken(): string {
+  return localStorage.getItem(TOKEN_KEY) ?? ''
+}
+
+export function setToken(token: string) {
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export function clearToken() {
+  localStorage.removeItem(TOKEN_KEY)
+}
+
+// 401 时清空凭证并跳转登录页。
+function handleUnauthorized() {
+  clearToken()
+  if (window.location.hash !== '#/login') {
+    window.location.hash = '#/login'
+  }
+}
+
 async function request<T>(method: string, url: string, body?: unknown, timeoutMs = DEFAULT_TIMEOUT): Promise<T> {
   const opts: RequestInit = { method, headers: {} }
+  const token = getToken()
+  if (token) {
+    opts.headers = { Authorization: `Bearer ${token}` }
+  }
   if (body !== undefined) {
-    opts.headers = { 'Content-Type': 'application/json' }
+    opts.headers = { ...opts.headers, 'Content-Type': 'application/json' }
     opts.body = JSON.stringify(body)
   }
   const ctrl = new AbortController()
@@ -18,6 +45,9 @@ async function request<T>(method: string, url: string, body?: unknown, timeoutMs
   try {
     const resp = await fetch(BASE + url, opts)
     const json = (await resp.json()) as Result<T>
+    if (json.code === 401) {
+      handleUnauthorized()
+    }
     if (json.code !== 200) {
       throw new Error(json.message)
     }
@@ -35,15 +65,26 @@ async function request<T>(method: string, url: string, body?: unknown, timeoutMs
 export const api = {
   ping: () => request<null>('GET', '/api/ping'),
 
+  // 登录
+  login: (username: string, password: string) =>
+    request<import('../types').LoginResp>('POST', '/api/login', { username, password }),
+  logout: () => request<null>('POST', '/api/logout'),
+  checkLogin: () => request<import('../types').CheckLoginResp>('POST', '/api/checkLogin'),
+
   // 配置
   getConfig: () => request<import('../types').Config>('POST', '/api/config'),
   setConfig: (cfg: Partial<import('../types').Config>) =>
     request<null>('POST', '/api/setConfig', cfg),
-  exportConfig: () => fetch(BASE + '/api/exportConfig'),
+  exportConfig: () =>
+    fetch(BASE + '/api/exportConfig', { headers: { Authorization: `Bearer ${getToken()}` } }),
   importConfig: (file: File) => {
     const form = new FormData()
     form.append('file', file)
-    return fetch(BASE + '/api/importConfig', { method: 'POST', body: form })
+    return fetch(BASE + '/api/importConfig', {
+      method: 'POST',
+      body: form,
+      headers: { Authorization: `Bearer ${getToken()}` },
+    })
   },
 
   // 订阅

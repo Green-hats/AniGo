@@ -17,5 +17,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // antd 体积较大，适度放宽大 chunk 告警阈值
+    chunkSizeWarningLimit: 700,
   },
 })

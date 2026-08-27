@@ -309,8 +309,8 @@ func (t *TaskManager) Stop() { t.cancel(); t.wg.Wait() }
 
 - `httpapi.Server` 持有所有 service 的引用（main 注入）
 - 路由用 Gin group，路径/契约**尽量保持与老项目一致**（前端迁移成本低）
-- 中间件：当前仅 `gin.Logger()` / `gin.Recovery()`
-- ⚠️ **鉴权未实现**：`auth.CheckAuth`（登录/令牌/IP 白名单）尚未落地，任意访问者都可读写配置（含 AI Key、115 Cookie）
+- 中间件：`gin.Logger()` / `gin.Recovery()` + 登录鉴权中间件（见下）
+- **鉴权**：单账号密码登录。`POST /api/login` 返回随机不透明 token（内存会话，有效期 `loginEffectiveHours` 小时），其余 `/api/*` 均需携带 `Authorization: Bearer <token>`；`/api/ping`、`/api/login`、`/api/custom.js`、`/api/custom.css` 免鉴权；`login.password` 为空（发布版首次配置）时放行。密码以 bcrypt 存储，老配置 MD5 登录时自动升级。未登录返回 `code:401`，前端跳转登录页。
 - handler 只做：绑定请求体 → 调 service → 包装 `model.Result{code,message,data,t}` 响应
 - 静态资源：`frontend/dist` 构建产物拷入 `internal/httpapi/static/` 用 `embed` 嵌入，Gin `NoRoute` 兜底 SPA
 
@@ -350,7 +350,7 @@ frontend/
 6. **M5 元数据**：bgm/animes.garden provider ✅（Mikan 未实现）
 7. **M6 通知**：Notifier 接口 + Telegram/Bark/ServerChan/WebHook/Shell/System ✅
 8. **M7 前端**：React 骨架 + 首页/番剧源/设置/日志页面 ✅
-9. **M8 打磨**：日志/前端体验 ✅；鉴权 ⚠️ 未实现；e2e 集成测试 ✅
+9. **M8 打磨**：日志/前端体验 ✅；鉴权 ✅（单账号登录 + bcrypt + 内存会话）；e2e 集成测试 ✅
 
 > 实际实现还包含：状态接口（`/api/status`）、日志页、115 扫码脚本、播放代理（`/api/file`）、订阅自动触发下载。
 
@@ -367,7 +367,4 @@ frontend/
 8. 存储：JSON 文件（契约兼容）
 9. DI：手动（main 组装）
 10. 番剧源：animes.garden 为主（Mikan/ani-bt 未实现）
-
-**开放问题**：
-1. 鉴权方案（当前无鉴权，见第 8 节 ⚠️）
-2. 是否需要老项目真实 json 样本做迁移测试
+11. 鉴权：单账号密码登录（bcrypt 存储 + 内存不透明 token 会话）

@@ -22,6 +22,7 @@ type Server struct {
 	notify   *service.NotifyService
 	logs     *service.LogService
 	status   *service.StatusService
+	sessions *sessionStore
 }
 
 // NewServer 构建注册了所有路由的 Gin 引擎。
@@ -37,6 +38,7 @@ func NewServer(cfg *service.ConfigService, ani *service.AniService, rss *service
 		notify:   notify,
 		logs:     logs,
 		status:   status,
+		sessions: newSessionStore(),
 	}
 	s.register()
 	return s
@@ -51,10 +53,18 @@ func (s *Server) register() {
 
 	r.Use(gin.Logger(), gin.Recovery())
 
+	// 鉴权（白名单端点放行，其余 /api 需登录）
+	r.Use(s.authMiddleware())
+
 	// 免鉴权端点
 	r.Any("/api/ping", s.handlePing)
+	r.POST("/api/login", s.handleLogin)
 	r.GET("/api/custom.js", s.handleCustomJs)
 	r.GET("/api/custom.css", s.handleCustomCss)
+
+	// 登录态
+	r.POST("/api/logout", s.handleLogout)
+	r.POST("/api/checkLogin", s.handleCheckLogin)
 
 	// 配置
 	r.POST("/api/config", s.handleConfig)

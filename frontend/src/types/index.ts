@@ -14,6 +14,15 @@ export interface Login {
   key?: string
 }
 
+export interface LoginResp {
+  login: boolean
+  token: string
+}
+
+export interface CheckLoginResp {
+  login: boolean
+}
+
 export interface NotificationConfig {
   enable: boolean
   retry: number

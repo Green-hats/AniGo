@@ -2,12 +2,16 @@ package httpapi
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/greenhats/anigo/internal/auth"
 	"github.com/greenhats/anigo/internal/domain"
 	"github.com/greenhats/anigo/internal/log"
 	"github.com/greenhats/anigo/internal/service"
@@ -29,6 +33,8 @@ func newTestServer(t *testing.T) *Server {
 	}
 	// 关闭 AI：默认配置带开发 Key，避免测试触发真实网络请求
 	cfg.Get().AiApiKey = ""
+	// 关闭鉴权：现有测试不带凭证，密码置空即放行（发布版首次配置同款语义）
+	cfg.Get().Login.Password = ""
 	cache := store.NewTTLCache()
 	logger := log.New(64)
 	rss := service.NewRssService(cfg, logger)
@@ -217,6 +223,209 @@ func TestAIPingNotConfigured(t *testing.T) {
 	res := decodeResult(t, w)
 	if res.Code != 500 {
 		t.Errorf("未配置 AI 应返回 500, got %d", res.Code)
+	}
+}
+
+// doReqAuth 与 doReq 相同，但附带 Bearer token。
+func doReqAuth(t *testing.T, s *Server, method, path string, body interface{}, token string) *httptest.ResponseRecorder {
+	t.Helper()
+	var rdr io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("marshal body: %v", err)
+		}
+		rdr = bytes.NewReader(b)
+	}
+	req := httptest.NewRequest(method, path, rdr)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, req)
+	return w
+}
+
+// loginAndGetToken 以指定密码登录并返回 token。
+func loginAndGetToken(t *testing.T, s *Server, password string) string {
+	t.Helper()
+	w := doReq(t, s, http.MethodPost, "/api/login", map[string]interface{}{
+		"username": "admin",
+		"password": password,
+	})
+	res := decodeResult(t, w)
+	if res.Code != 200 {
+		t.Fatalf("login code = %d, msg=%s", res.Code, res.Message)
+	}
+	token := res.Data.(map[string]interface{})["token"].(string)
+	if token == "" {
+		t.Fatal("login 未返回 token")
+	}
+	return token
+}
+
+// bcryptHash 生成真实 bcrypt 哈希（测试用）。
+func bcryptHash(t *testing.T, plain string) string {
+	t.Helper()
+	h, err := auth.HashPassword(plain)
+	if err != nil {
+		t.Fatalf("HashPassword: %v", err)
+	}
+	return h
+}
+
+func TestLoginWrongPassword(t *testing.T) {
+	s := newTestServer(t)
+	s.cfg.Get().Login.Password = bcryptHash(t, "secret")
+	w := doReq(t, s, http.MethodPost, "/api/login", map[string]interface{}{
+		"username": "admin",
+		"password": "wrong",
+	})
+	res := decodeResult(t, w)
+	if res.Code != 401 {
+		t.Errorf("错误密码 login code = %d, want 401", res.Code)
+	}
+}
+
+func TestLoginWrongUsername(t *testing.T) {
+	s := newTestServer(t)
+	s.cfg.Get().Login.Password = bcryptHash(t, "secret")
+	w := doReq(t, s, http.MethodPost, "/api/login", map[string]interface{}{
+		"username": "hacker",
+		"password": "secret",
+	})
+	res := decodeResult(t, w)
+	if res.Code != 401 {
+		t.Errorf("错误用户名 login code = %d, want 401", res.Code)
+	}
+}
+
+func TestAuthRequired(t *testing.T) {
+	s := newTestServer(t)
+	s.cfg.Get().Login.Password = bcryptHash(t, "secret")
+	// 无 token 访问受保护端点应 401
+	w := doReq(t, s, http.MethodPost, "/api/config", nil)
+	if res := decodeResult(t, w); res.Code != 401 {
+		t.Errorf("无 token 请求 code = %d, want 401", res.Code)
+	}
+	// 白名单端点仍放行
+	w2 := doReq(t, s, http.MethodGet, "/api/ping", nil)
+	if res := decodeResult(t, w2); res.Code != 200 {
+		t.Errorf("ping code = %d, want 200", res.Code)
+	}
+	// login 本身放行
+	w3 := doReq(t, s, http.MethodPost, "/api/login", map[string]interface{}{"username": "admin", "password": "secret"})
+	if res := decodeResult(t, w3); res.Code != 200 {
+		t.Errorf("login code = %d, want 200", res.Code)
+	}
+}
+
+func TestLoginAndAccess(t *testing.T) {
+	s := newTestServer(t)
+	s.cfg.Get().Login.Password = bcryptHash(t, "secret")
+	token := loginAndGetToken(t, s, "secret")
+	// 带 token 访问受保护端点成功
+	w := doReqAuth(t, s, http.MethodPost, "/api/config", nil, token)
+	if res := decodeResult(t, w); res.Code != 200 {
+		t.Errorf("带 token 请求 code = %d, want 200", res.Code)
+	}
+	// checkLogin 应返回已登录
+	w2 := doReqAuth(t, s, http.MethodPost, "/api/checkLogin", nil, token)
+	res := decodeResult(t, w2)
+	if res.Code != 200 {
+		t.Errorf("checkLogin code = %d, want 200", res.Code)
+	}
+	if login := res.Data.(map[string]interface{})["login"]; login != true {
+		t.Errorf("checkLogin login = %v, want true", login)
+	}
+}
+
+func TestLogout(t *testing.T) {
+	s := newTestServer(t)
+	s.cfg.Get().Login.Password = bcryptHash(t, "secret")
+	token := loginAndGetToken(t, s, "secret")
+	w := doReqAuth(t, s, http.MethodPost, "/api/logout", nil, token)
+	if res := decodeResult(t, w); res.Code != 200 {
+		t.Fatalf("logout code = %d", res.Code)
+	}
+	// 登出后原 token 失效
+	w2 := doReqAuth(t, s, http.MethodPost, "/api/config", nil, token)
+	if res := decodeResult(t, w2); res.Code != 401 {
+		t.Errorf("登出后请求 code = %d, want 401", res.Code)
+	}
+}
+
+func TestLegacyMD5PasswordUpgrade(t *testing.T) {
+	s := newTestServer(t)
+	// 模拟老配置：MD5 密码
+	legacy := fmt.Sprintf("%x", md5.Sum([]byte("admin")))
+	s.cfg.Get().Login.Password = legacy
+	token := loginAndGetToken(t, s, "admin")
+	if token == "" {
+		t.Fatal("MD5 密码登录应成功")
+	}
+	// 登录成功后密码应升级为 bcrypt
+	if s.cfg.Get().Login.Password == legacy {
+		t.Error("MD5 密码应自动升级为 bcrypt")
+	}
+}
+
+func TestSetConfigHashesPassword(t *testing.T) {
+	s := newTestServer(t)
+	// 设置明文密码
+	w := doReq(t, s, http.MethodPost, "/api/setConfig", map[string]interface{}{
+		"login": map[string]interface{}{"username": "admin", "password": "mysecret"},
+	})
+	if res := decodeResult(t, w); res.Code != 200 {
+		t.Fatalf("setConfig code = %d, msg=%s", res.Code, res.Message)
+	}
+	// 存储值应为 bcrypt 而非明文
+	stored := s.cfg.Get().Login.Password
+	if stored == "mysecret" {
+		t.Error("密码不应以明文存储")
+	}
+	// 用明文能登录（登录后配置已启用鉴权，需带 token）
+	token := loginAndGetToken(t, s, "mysecret")
+	// 读配置不泄露密码
+	w3 := doReqAuth(t, s, http.MethodPost, "/api/config", nil, token)
+	res3 := decodeResult(t, w3)
+	login := res3.Data.(map[string]interface{})["login"].(map[string]interface{})
+	if login["password"] != "" {
+		t.Errorf("读取配置密码应为空, got %q", login["password"])
+	}
+}
+
+func TestEmptyPasswordBypass(t *testing.T) {
+	s := newTestServer(t)
+	// newTestServer 已把密码置空：无凭证也应放行（首次配置语义）
+	w := doReq(t, s, http.MethodPost, "/api/config", nil)
+	if res := decodeResult(t, w); res.Code != 200 {
+		t.Errorf("空密码时请求 code = %d, want 200", res.Code)
+	}
+}
+
+func TestSessionPurgeExpiredOnCreate(t *testing.T) {
+	ss := newSessionStore()
+	// 两个已过期会话
+	if _, err := ss.create(-2 * time.Hour); err != nil {
+		t.Fatalf("create expired: %v", err)
+	}
+	if _, err := ss.create(-1 * time.Hour); err != nil {
+		t.Fatalf("create expired: %v", err)
+	}
+	// 新会话触发惰性清理
+	tok, err := ss.create(time.Hour)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if got := len(ss.sessions); got != 1 {
+		t.Errorf("过期会话应在下次 create 时被清理, got %d sessions, want 1", got)
+	}
+	if !ss.valid(tok) {
+		t.Error("未过期会话应保持有效")
 	}
 }
 

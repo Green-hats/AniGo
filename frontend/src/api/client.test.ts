@@ -51,6 +51,30 @@ describe('api client', () => {
     await expect(api.ping()).rejects.toThrow('内部错误')
   })
 
+  it('带 token 时注入 Authorization 头', async () => {
+    localStorage.setItem('anigo_token', 'tok123')
+    mockFetch.mockResolvedValue(jsonResp({ code: 200, message: '', data: null, t: 0 }))
+    await api.ping()
+
+    const [, opts] = mockFetch.mock.calls[0]
+    expect(opts.headers['Authorization']).toBe('Bearer tok123')
+  })
+
+  it('401 时清空 token 并抛错', async () => {
+    localStorage.setItem('anigo_token', 'tok123')
+    mockFetch.mockResolvedValue(jsonResp({ code: 401, message: '未登录或登录已过期', data: null, t: 0 }))
+    await expect(api.getConfig()).rejects.toThrow('未登录或登录已过期')
+    expect(localStorage.getItem('anigo_token')).toBeNull()
+  })
+
+  it('login 返回 token', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResp({ code: 200, message: '', data: { login: true, token: 'abc' }, t: 0 }),
+    )
+    const res = await api.login('admin', 'admin')
+    expect(res.token).toBe('abc')
+  })
+
   it('导入配置使用 FormData 而非 JSON', async () => {
     mockFetch.mockResolvedValue(new Response(null, { status: 200 }))
     const file = new File(['{}'], 'config.v2.json', { type: 'application/json' })

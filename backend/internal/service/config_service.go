@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/greenhats/anigo/internal/auth"
 	"github.com/greenhats/anigo/internal/domain"
 )
 
@@ -65,14 +66,46 @@ func (s *ConfigService) ConfigDirFile(rel string) string {
 
 // SetConfigRaw 将原始 JSON 体合并进配置（部分合并，
 // 镜像 BeanUtil.copyProperties 的忽略空值语义）并持久化。
+// 若入参携带明文密码（非空），会先转为 bcrypt 哈希再存储。
 func (s *ConfigService) SetConfigRaw(raw []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	cur := s.cfg
+	var err error
+	if raw, err = hashPasswordInRaw(raw); err != nil {
+		return err
+	}
 	if err := mergeConfigInto(cur, raw); err != nil {
 		return err
 	}
 	return s.store.SaveConfig(cur)
+}
+
+// hashPasswordInRaw 将 raw 中非空的 login.password（明文）替换为 bcrypt 哈希。
+func hashPasswordInRaw(raw []byte) ([]byte, error) {
+	var inc struct {
+		Login struct {
+			Password string `json:"password"`
+		} `json:"login"`
+	}
+	if err := json.Unmarshal(raw, &inc); err != nil {
+		return nil, err
+	}
+	if inc.Login.Password == "" || auth.IsBcrypt(inc.Login.Password) {
+		return raw, nil
+	}
+	hash, err := auth.HashPassword(inc.Login.Password)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil, err
+	}
+	if lg, ok := m["login"].(map[string]interface{}); ok {
+		lg["password"] = hash
+	}
+	return json.Marshal(m)
 }
 
 // AniList 返回订阅列表。
