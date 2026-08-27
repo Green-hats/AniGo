@@ -97,6 +97,9 @@ make dev    # 后端 :7789 + Vite 热更新 :37789（/api 自动代理）
 ```bash
 make test                      # 后端：go vet ./... && go test ./...
 cd frontend && npm run test    # 前端：vitest（组件/API）
+cd frontend && npm run lint    # 前端：eslint 静态检查
+cd frontend && npm run test:coverage  # 前端：vitest + 覆盖率（阈值 40%）
+cd frontend && npm audit       # 前端：依赖漏洞扫描
 make e2e                       # 端到端集成测试（需真实外部服务：AI/115/BGM/animes.garden）
 ```
 

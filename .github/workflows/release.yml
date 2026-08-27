@@ -58,13 +58,7 @@ jobs:
           cp -r ../frontend/dist/. internal/httpapi/static/
 
       - name: Generate secrets stub
-        run: |
-          cat > backend/internal/domain/secrets.go <<'EOF'
-          package domain
-
-          func defaultAiApiKey() string    { return "" }
-          func defaultPan115Cookie() string { return "" }
-          EOF
+        run: bash scripts/gen_secrets_stub.sh
 
       - name: Cross-compile
         env:

@@ -7,5 +7,16 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary'],
+      // 保守阈值：拦截覆盖率大幅回退，页面组件可逐步补测提升
+      thresholds: {
+        statements: 40,
+        branches: 20,
+        functions: 15,
+        lines: 40,
+      },
+    },
   },
 })

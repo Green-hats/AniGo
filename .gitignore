@@ -13,6 +13,7 @@ backend/dist/
 # 前端依赖与构建产物
 frontend/node_modules/
 frontend/dist/
+frontend/coverage/
 frontend/tsconfig.tsbuildinfo
 
 # 后端嵌入的前端构建产物（由 make ui 生成）

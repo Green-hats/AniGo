@@ -19,13 +19,7 @@ jobs:
           cache-dependency-path: backend/go.sum
 
       - name: Generate secrets stub
-        run: |
-          cat > backend/internal/domain/secrets.go <<'EOF'
-          package domain
-
-          func defaultAiApiKey() string    { return "" }
-          func defaultPan115Cookie() string { return "" }
-          EOF
+        run: bash scripts/gen_secrets_stub.sh
 
       - name: Prepare static embed placeholder
         run: |
@@ -56,8 +50,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         run: npm run build
 
-      - name: Test
-        run: npm run test
+      - name: Test with coverage
+        run: npm run test:coverage
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high

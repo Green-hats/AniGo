@@ -206,7 +206,22 @@ export interface GardenGroup {
   rss: string
   bgmId: string
   lastUpdatedAt: string
-  items: any[]
+  items: GardenItem[]
+}
+
+export interface GardenItem {
+  id: string
+  provider: string
+  providerId: string
+  title: string
+  href: string
+  type: string
+  magnet: string
+  size: number
+  formatSize: string
+  createdAt: string
+  fetchedAt: string
+  subjectId: string
 }
 
 export interface LoginStatus {

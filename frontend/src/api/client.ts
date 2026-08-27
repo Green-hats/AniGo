@@ -24,7 +24,7 @@ async function request<T>(method: string, url: string, body?: unknown, timeoutMs
     return json.data
   } catch (e) {
     if ((e as Error).name === 'AbortError') {
-      throw new Error('请求超时')
+      throw new Error('请求超时', { cause: e })
     }
     throw e
   } finally {
