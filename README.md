@@ -215,12 +215,6 @@ make e2e                       # 端到端集成测试（需真实外部服务�
 
 > 详见 [`docs/architecture.md`](docs/architecture.md) 与 [`docs/pipeline.md`](docs/pipeline.md)。
 
-## 📅 里程碑
-
-```
-M1 骨架 → M2 配置 → M3 订阅+RSS → M3.5 AI引擎 → M4 下载核心 → M5 元数据 → M6 通知 → M7 前端
-```
-
 ## 📄 免责声明
 
 本工具为中立性技术辅助工具，请遵守当地法律法规，勿用于盗版传播。
