@@ -27,6 +27,11 @@ jobs:
           func defaultPan115Cookie() string { return "" }
           EOF
 
+      - name: Prepare static embed placeholder
+        run: |
+          mkdir -p backend/internal/httpapi/static
+          echo '<!doctype html><title>placeholder</title>' > backend/internal/httpapi/static/index.html
+
       - name: Vet & Test
         run: make test
 
