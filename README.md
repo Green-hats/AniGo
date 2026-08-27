@@ -17,7 +17,7 @@
   <img src="https://github.com/Green-hats/AniGo/actions/workflows/ci.yml/badge.svg" alt="CI">
 </p>
 
-[快速开始](#快速开始) · [核心特性](#核心特性) · [使用流程](#使用流程) · [配置指南](#配置指南) · [项目结构](#项目结构) · [测试](#测试) · [架构设计](#架构设计)
+[快速开始](#快速开始) · [核心特性](#核心特性) · [配置指南](#配置指南) · [项目结构](#项目结构) · [架构设计](#架构设计)
 
 </div>
 
@@ -62,9 +62,6 @@
 - **Go 1.26+**（构建）
 - **Node.js 20+**（构建前端，`make all` 会先构建前端再嵌入）
 
-> [!NOTE]
-> 前端构建产物（`frontend/dist` 与嵌入用的 `backend/internal/httpapi/static`）在 `.gitignore` 中，clone 后需先 `make all` 构建，否则后端启动时没有嵌入前端页面。
-
 ### 构建
 
 ```bash
@@ -87,76 +84,29 @@ CONFIG=/path ./backend/bin/anigo  # 自定义配置目录
 
 首次启动自动生成 `config.v2.json` / `ani.v2.json`。浏览器打开 `http://服务器:7789` 即可管理。
 
-> [!IMPORTANT]
-> 配置目录按**启动时的工作目录**解析：默认 `./config`，`CONFIG` 环境变量可指定。务必始终在仓库根目录启动，避免在 `backend/` 下启动导致生成第二份配置。
-
 ### 开发模式（前后端热更新）
 
 ```bash
 make dev    # 后端 :7789 + Vite 热更新 :37789（/api 自动代理）
 ```
 
-## 使用流程
-
-1. 一次性配置：115 Cookie、AI Key、通知渠道
-2. 番剧源页选番剧 → 选择字幕组 → 一键订阅
-3. 后台每 N 分钟自动抓 RSS → AI 解析 → 过滤 → 重命名
-4. 查重后自动提交 115 离线下载
-5. 缺集/摸鱼/完结自动检测 → 通知推送
-6. 任意设备浏览器查看进度、管理订阅
-7. 首页点击播放 → 调用系统播放器在线观看云端已下载文件
-
-> 完整下载链路（RSS → AI 解析 → 过滤选版 → 查重 → 115 离线下载）见 [`docs/pipeline.md`](docs/pipeline.md)。
-
-### 在线播放（可选）
-
-首页订阅卡片点击播放图标，通过 `mpv-handler://` 协议拉起系统播放器（mpv 等）观看 115 云端文件：
-
-1. 安装 [mpv-handler](https://github.com/akiirui/mpv-handler) 并注册 `mpv-handler://` 协议
-2. 前端通过本地 `/api/file` 代理转发 115 CDN 流（自动带 115 UA 取流），播放器只访问本地端点，不暴露云端地址
-3. 播放列表有 30 秒短缓存，避免频繁遍历 115 目录
-
-## 配置指南
-
-### AI 解析（可选，默认开启）
-
-设置页 → AI 解析，或直接改 `config.v2.json`：
-
-```json
-{
-  "aiEnabled": true,
-  "aiProvider": "deepseek",
-  "aiApiKey": "sk-...",
-  "aiBaseURL": "https://api.deepseek.com",
-  "aiModel": "deepseek-v4-flash"
-}
-```
-
-支持 OpenAI 兼容接口（DeepSeek / OpenAI / 通义 / 智谱 等）。集号提取与规则匹配全部由 AI 完成；某源连续失败会进入退避期，不影响其他订阅。
-
-> [!WARNING]
-> 项目内置的测试密钥放在 `backend/internal/domain/secrets.go`（已被 .gitignore 排除，不提交）。该文件被 `config.go` 的默认值引用，**clone 后需自行创建该文件**（否则编译报错），或将 Key/Cookie 直接填到设置页（运行时以配置为准）。
-
-### 115 网盘下载
-
-1. 获取 115 Cookie（`UID=...; CID=...; SEID=...; KID=...`），可用项目内置的扫码脚本（见下）
-2. 设置页 → 下载 → 填入 Cookie → 测试 115 登录
-3. 通过后开始云端离线下载，文件落盘在 115 网盘
-
-#### 扫码获取 115 Cookie 脚本
-
-`scripts/qrcode_cookie_115.py` 可通过扫码登录 115 并打印 Cookie，避免手动从浏览器复制：
+### 测试
 
 ```bash
-pip install qrcode          # 需要 qrcode 库在终端输出二维码
-python scripts/qrcode_cookie_115.py            # 终端显示二维码，手机 115 扫码
-python scripts/qrcode_cookie_115.py -o         # 弹出二维码图片窗口扫码
-python scripts/qrcode_cookie_115.py android    # 指定登录设备类型（会踢掉同类型已登录设备）
+make test                      # 后端：go vet ./... && go test ./...
+cd frontend && npm run test    # 前端：vitest（组件/API）
+make e2e                       # 端到端集成测试（需真实外部服务：AI/115/BGM/animes.garden）
 ```
 
-脚本输出形如 `UID=...; CID=...; SEID=...; KID=...`，直接填入设置页即可。
+覆盖范围：后端单元测试（store/util/domain/rename/rss/service/provider）、前端测试（API client/App 路由/SideMenu 导航）、E2E（基础 API/配置/AI/元数据/RSS/订阅/115 登录/通知/导出导入）。
 
-> 出处：[ChenyangGao/qrcode_cookie_115 · Gist](https://gist.github.com/ChenyangGao/d26a592a0aeb13465511c885d5c7ad61)
+> [!NOTE]
+> **在线播放（可选）**：首页订阅卡片点击播放图标，通过 `mpv-handler://` 协议拉起系统播放器（mpv 等）观看 115 云端文件。需安装并注册 [mpv-handler](https://github.com/akiirui/mpv-handler)；前端经本地 `/api/file` 代理转发 115 CDN 流，播放器只访问本地端点，不暴露云端地址。
+
+> [!NOTE]
+> **扫码获取 115 Cookie**：`scripts/qrcode_cookie_115.py` 可扫码登录 115 并打印 Cookie（`UID=...; CID=...; SEID=...; KID=...`）。安装 `pip install qrcode` 后运行 `python scripts/qrcode_cookie_115.py`，免去手动复制。出处：[ChenyangGao/qrcode_cookie_115](https://gist.github.com/ChenyangGao/d26a592a0aeb13465511c885d5c7ad61)
+
+## 配置指南
 
 ### 下载路径模板
 
@@ -168,7 +118,7 @@ ${letter} ${quarter} ${quarterName} ${year} ${month} ${monthFormat}
 ${bgmId} ${jpTitle} ${subgroup}
 ```
 
-### 通知
+### 通知模板
 
 配置多条通知渠道（Telegram/Bark/ServerChan/WebHook/Shell/系统日志），每条可设定：
 
@@ -202,26 +152,39 @@ anigo/
 └── go.work                   # Go workspace（backend 模块）
 ```
 
-## 测试
-
-```bash
-make test                      # 后端：go vet ./... && go test ./...
-cd frontend && npm run test    # 前端：vitest（组件/API）
-make e2e                       # 端到端集成测试（需真实外部服务：AI/115/BGM/animes.garden）
-```
-
-**覆盖范围：**
-
-- **后端单元测试**：store（JSON 持久化/默认值/TTL 缓存）、util（格式化/拼音）、domain（时间/ID 序列化）、rename（集号/重命名模板）、rss、service、provider（AI/BGM/notifier/115/base）
-- **前端测试**：API client（mock fetch 验证请求/错误处理）、App 路由渲染、SideMenu 导航
-- **E2E**：基础 API / 配置 / AI / 元数据 / RSS 解析 / 订阅管理 / 115 登录 / 通知 / 导出导入
-
 ## 架构设计
 
-- **端口-适配器（Hexagonal）**：业务逻辑只依赖 `domain/ports.go` 的接口，网盘/元数据/通知/AI 全部可插拔
-- **手动依赖注入**：main 是唯一组装点，无全局单例
-- **可测试**：HTTP 请求函数可注入，单测不依赖网络
-- **契约兼容**：`config.v2.json` / `ani.v2.json` 格式与上游一致，可迁移
+```mermaid
+graph LR
+    subgraph Web[浏览器]
+        UI[前端 React + Ant Design]
+    end
+
+    subgraph Core[后端 Go]
+        HTTP[HTTP API · Gin]
+        SVC[业务服务 Service]
+        TASK[后台任务 RSS 轮询]
+        PORT[端口接口 ports.go]
+    end
+
+    subgraph Adapter[适配器 Provider]
+        AI[AI 解析 DeepSeek]
+        BGM[元数据 Bangumi]
+        GARDEN[番剧源 animes.garden]
+        NOTIFY[通知 Telegram/Bark/WebHook]
+        CLOUD[网盘 115]
+    end
+
+    UI -->|HTTP| HTTP
+    HTTP --> SVC
+    SVC --> PORT
+    TASK --> PORT
+    PORT --> AI
+    PORT --> BGM
+    PORT --> GARDEN
+    PORT --> NOTIFY
+    PORT --> CLOUD
+```
 
 **技术栈：**
 
