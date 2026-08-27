@@ -37,13 +37,17 @@
 
 ## 界面预览
 
-| 首页（我的订阅） | 番剧源 |
-| --- | --- |
-| ![首页](docs/screenshots/home.png) | ![番剧源](docs/screenshots/garden.png) |
+### 首页（我的订阅）
 
-| 设置 | 日志 |
-| --- | --- |
-| ![设置](docs/screenshots/settings.png) | ![日志](docs/screenshots/logs.png) |
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="首页">
+</p>
+
+番剧源 / 设置 / 日志：
+
+| 番剧源 | 设置 | 日志 |
+| --- | --- | --- |
+| ![番剧源](docs/screenshots/garden.png) | ![设置](docs/screenshots/settings.png) | ![日志](docs/screenshots/logs.png) |
 
 ## 快速开始
 
