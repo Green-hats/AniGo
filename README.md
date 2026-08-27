@@ -37,17 +37,17 @@
 
 ## 界面预览
 
-### 首页（我的订阅）
-
 <p align="center">
-  <img src="docs/screenshots/home.png" alt="首页">
+  <img src="docs/screenshots/home.png" width="760" alt="首页 · 我的订阅">
 </p>
 
-番剧源 / 设置 / 日志：
+<p align="center">
+  <em>首页 · 我的订阅</em>
+</p>
 
 | 番剧源 | 设置 | 日志 |
 | --- | --- | --- |
-| ![番剧源](docs/screenshots/garden.png) | ![设置](docs/screenshots/settings.png) | ![日志](docs/screenshots/logs.png) |
+| <img src="docs/screenshots/garden.png" width="240" alt="番剧源"> | <img src="docs/screenshots/settings.png" width="240" alt="设置"> | <img src="docs/screenshots/logs.png" width="240" alt="日志"> |
 
 ## 快速开始
 
@@ -92,15 +92,13 @@ make dev    # 后端 :7789 + Vite 热更新 :37789（/api 自动代理）
 
 ## 使用流程
 
-```
-① 一次性配置：115 Cookie、AI Key、通知渠道
-② 番剧源页选番剧 → 选择字幕组 → 一键订阅
-③ 后台每 N 分钟自动抓 RSS → AI 解析 → 过滤 → 重命名
-④ 查重后自动提交 115 离线下载
-⑤ 缺集/摸鱼/完结自动检测 → 通知推送
-⑥ 任意设备浏览器查看进度、管理订阅
-⑦ 首页点击播放 → 调用系统播放器在线观看云端已下载文件
-```
+1. 一次性配置：115 Cookie、AI Key、通知渠道
+2. 番剧源页选番剧 → 选择字幕组 → 一键订阅
+3. 后台每 N 分钟自动抓 RSS → AI 解析 → 过滤 → 重命名
+4. 查重后自动提交 115 离线下载
+5. 缺集/摸鱼/完结自动检测 → 通知推送
+6. 任意设备浏览器查看进度、管理订阅
+7. 首页点击播放 → 调用系统播放器在线观看云端已下载文件
 
 > 完整下载链路（RSS → AI 解析 → 过滤选版 → 查重 → 115 离线下载）见 [`docs/pipeline.md`](docs/pipeline.md)。
 
@@ -230,13 +228,11 @@ make e2e                       # 端到端集成测试（需真实外部服务�
 
 > 详见 [`docs/architecture.md`](docs/architecture.md) 与 [`docs/pipeline.md`](docs/pipeline.md)。
 
-## 免责声明
-
-本工具为中立性技术辅助工具，请遵守当地法律法规，勿用于盗版传播。
-
 ## License
 
-[GNU General Public License v3.0](LICENSE)（GPL-3.0）。
+本项目采用 [GNU General Public License v3.0](LICENSE)（GPL-3.0）。
+
+> 免责声明：本工具为中立性技术辅助工具，请遵守当地法律法规，勿用于盗版传播。
 
 ## 致谢
 
