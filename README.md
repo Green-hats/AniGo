@@ -36,8 +36,14 @@
 ## 核心特性
 
 <table>
+  <thead>
+    <tr>
+      <th width="220">能力</th>
+      <th>说明</th>
+    </tr>
+  </thead>
   <tbody>
-    <tr><td width="220"><b>云端追番</b></td><td>RSS 自动离线下载到 115 网盘，本地零存储</td></tr>
+    <tr><td><b>云端追番</b></td><td>RSS 自动离线下载到 115 网盘，本地零存储</td></tr>
     <tr><td><b>AI 解析</b></td><td>DeepSeek 等大模型批量解析标题，提取集数 / 分辨率 / 字幕组 / 选版信号，同步完成规则与简中字幕筛选</td></tr>
     <tr><td><b>智能选版</b></td><td>同集多版本自动择优（分辨率 > 压制源 > 编码 > 色深 > 字幕嵌入/语言），每集不重复下载</td></tr>
     <tr><td><b>四源聚合</b></td><td><a href="https://animes.garden">animes.garden</a>（動漫花園 + 蜜柑 + 萌番组 + ANi 聚合）作番剧源</td></tr>
