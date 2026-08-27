@@ -25,13 +25,6 @@ type StandbyRss struct {
 	Offset int    `json:"offset"`
 }
 
-// PendingDownload 是已提交离线下载但尚未在云端确认完成的资源。
-// key 为 infoHash，value 为目标云端路径与主源标记；完成确认后删除。
-type PendingDownload struct {
-	Path   string `json:"path"`
-	Master bool   `json:"master"`
-}
-
 // Ani 是一个订阅，持久化为 ani.v2.json 的 JSON 数组。
 type Ani struct {
 	Sort                         int          `json:"sort"`
@@ -70,7 +63,6 @@ type Ani struct {
 	NotDownload                  []float64    `json:"notDownload"`
 	Downloaded                   []float64    `json:"downloaded"`
 	DownloadedHash               []string     `json:"downloadedHash"`
-	PendingDownload              map[string]PendingDownload `json:"pendingDownload"`
 	Procrastinating              bool         `json:"procrastinating"`
 	CustomRenameTemplateEnable   bool         `json:"customRenameTemplateEnable"`
 	CustomRenameTemplate         string       `json:"customRenameTemplate"`
@@ -94,10 +86,6 @@ func (a *Ani) Clone() *Ani {
 	c.NotDownload = append([]float64(nil), a.NotDownload...)
 	c.Downloaded = append([]float64(nil), a.Downloaded...)
 	c.DownloadedHash = append([]string(nil), a.DownloadedHash...)
-	c.PendingDownload = make(map[string]PendingDownload, len(a.PendingDownload))
-	for k, v := range a.PendingDownload {
-		c.PendingDownload[k] = v
-	}
 	c.CustomPriorityKeywords = append([]string(nil), a.CustomPriorityKeywords...)
 	c.CustomTags = append([]string(nil), a.CustomTags...)
 	return &c
@@ -120,7 +108,6 @@ func DefaultAni() *Ani {
 		NotDownload:             []float64{},
 		Downloaded:              []float64{},
 		DownloadedHash:          []string{},
-		PendingDownload:         map[string]PendingDownload{},
 		Procrastinating:         true,
 		CustomRenameTemplate:    "[${subgroup}] ${title} S${seasonFormat}E${episodeFormat}",
 		Message:                 true,

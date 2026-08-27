@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -91,87 +90,6 @@ func TestDownloadAniStopsOnCancel(t *testing.T) {
 	case <-done:
 	case <-time.After(3 * time.Second):
 		t.Fatal("ctx 取消后 DownloadAni 未提前返回")
-	}
-}
-
-// completeCloud 记录已提交的离线任务，并在文件出现后 FileExists 返回 true。
-type completeCloud struct{}
-
-func (completeCloud) Get(cfg *domain.Config) domain.CloudDriver { return &completeDriver{} }
-
-type completeDriver struct {
-	NoopDriver
-	complete map[string]bool
-}
-
-// FileExists 仅当路径在 complete 集合中出现时返回 true。
-func (d *completeDriver) FileExists(ctx context.Context, cfg *domain.Config, path string) (bool, error) {
-	return d.complete[path], nil
-}
-
-// TestCheckDownloadEndNotifiesOnCompletion 验证：
-// 提交离线任务后文件仍不存在时不发通知；文件在云端出现后，
-// checkDownloadEnd 触发 DOWNLOAD_END 通知并从 PendingDownload 移除。
-func TestCheckDownloadEndNotifiesOnCompletion(t *testing.T) {
-	s := store.NewJSONStore(t.TempDir())
-	cfg, err := NewConfigService(s, store.NewTTLCache())
-	if err != nil {
-		t.Fatalf("NewConfigService: %v", err)
-	}
-	cfg.Get().NotificationConfigList = []domain.NotificationConfig{
-		{
-			Enable:           true,
-			NotificationType: domain.NotifySystem,
-			StatusList:       []domain.NotificationStatusEnum{domain.NotifyDownloadEnd},
-		},
-	}
-	notifyMsg := make(chan string, 10)
-	notifySvc := NewNotifyService(cfg, func(msg string) { notifyMsg <- msg })
-
-	drv := &completeDriver{complete: map[string]bool{}}
-	d := NewDownloadService(cfg, nil, cloudFn{drv}, store.NewTTLCache(), nil, notifySvc, nil)
-
-	ani := domain.DefaultAni()
-	ani.Enable = true
-	ani.PendingDownload = map[string]domain.PendingDownload{
-		"hash1": {Path: "/番剧/测试/Season 1/ep01.mkv", Master: true},
-		"hash2": {Path: "/番剧/测试/Season 1/ep02.mkv", Master: false},
-	}
-
-	// 第一轮：文件尚未出现，不应有通知、不应移除
-	d.checkDownloadEnd(context.Background(), ani)
-	if len(ani.PendingDownload) != 2 {
-		t.Fatalf("文件未完成不应移除, got %d", len(ani.PendingDownload))
-	}
-
-	// 云端转存完成 ep01
-	drv.complete["/番剧/测试/Season 1/ep01.mkv"] = true
-	d.checkDownloadEnd(context.Background(), ani)
-	if len(ani.PendingDownload) != 1 {
-		t.Fatalf("完成后应移除 1 条, got %d", len(ani.PendingDownload))
-	}
-	if _, ok := ani.PendingDownload["hash1"]; ok {
-		t.Error("已完成的 hash1 应被移除")
-	}
-	select {
-	case msg := <-notifyMsg:
-		if !strings.Contains(msg, "ep01.mkv") {
-			t.Errorf("通知应含文件名, got %q", msg)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("DOWNLOAD_END 通知未发送")
-	}
-
-	// ep02 完成，pending 清空
-	drv.complete["/番剧/测试/Season 1/ep02.mkv"] = true
-	d.checkDownloadEnd(context.Background(), ani)
-	if len(ani.PendingDownload) != 0 {
-		t.Fatalf("全部完成后应清空, got %d", len(ani.PendingDownload))
-	}
-	select {
-	case <-notifyMsg:
-	case <-time.After(2 * time.Second):
-		t.Fatal("第二条 DOWNLOAD_END 通知未发送")
 	}
 }
 

@@ -25,7 +25,6 @@ type NotificationStatusEnum string
 
 const (
 	NotifyDownloadStart   NotificationStatusEnum = "DOWNLOAD_START"
-	NotifyDownloadEnd     NotificationStatusEnum = "DOWNLOAD_END"
 	NotifyOmit            NotificationStatusEnum = "OMIT"
 	NotifyError           NotificationStatusEnum = "ERROR"
 	NotifyCompleted       NotificationStatusEnum = "COMPLETED"

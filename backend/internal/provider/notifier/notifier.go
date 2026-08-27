@@ -83,8 +83,6 @@ func StatusMeta(status domain.NotificationStatusEnum) (string, string) {
 	switch status {
 	case domain.NotifyDownloadStart:
 		return "⬇️", "开始下载"
-	case domain.NotifyDownloadEnd:
-		return "✅", "下载完成"
 	case domain.NotifyOmit:
 		return "⚠️", "缺少集数"
 	case domain.NotifyError:

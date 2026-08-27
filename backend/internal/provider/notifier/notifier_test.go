@@ -47,7 +47,6 @@ func TestStatusMeta(t *testing.T) {
 		action   string
 	}{
 		{domain.NotifyDownloadStart, "⬇️", "开始下载"},
-		{domain.NotifyDownloadEnd, "✅", "下载完成"},
 		{domain.NotifyOmit, "⚠️", "缺少集数"},
 		{domain.NotifyError, "❌", "错误"},
 		{domain.NotifyCompleted, "🏁", "订阅完成"},

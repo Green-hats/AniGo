@@ -16,7 +16,6 @@ const CHANNEL_TYPES = [
 
 const STATUS_OPTIONS = [
   { value: 'DOWNLOAD_START', label: '下载开始' },
-  { value: 'DOWNLOAD_END', label: '下载完成' },
   { value: 'OMIT', label: '缺集' },
   { value: 'ERROR', label: '错误' },
   { value: 'COMPLETED', label: '订阅完成' },

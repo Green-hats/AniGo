@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -140,9 +139,6 @@ func (s *DownloadService) downloadAni(ctx context.Context, ani *domain.Ani, chec
 		}
 	}
 
-	// 先确认上一轮已提交下载的云端文件是否完成（异步转存可能已就绪）
-	s.checkDownloadEnd(ctx, ani)
-
 	items := s.rss.GetItems(ani)
 	s.logf("INFO", "download", "%s 刷新完成, 共 %d 个条目", ani.Title, len(items))
 	s.RssOmit(ani, items)
@@ -232,7 +228,6 @@ func (s *DownloadService) downloadAni(ctx context.Context, ani *domain.Ani, chec
 		s.cache.Put("hash:"+hash, reName, 24*time.Hour)
 		ani.Downloaded = append(ani.Downloaded, episode)
 		ani.DownloadedHash = append(ani.DownloadedHash, hash)
-		ani.PendingDownload[hash] = domain.PendingDownload{Path: savePath + "/" + reName, Master: item.Master}
 		sync = true
 		s.notifySend(ani, reName, item.Master, domain.NotifyDownloadStart)
 	}
@@ -257,45 +252,6 @@ func (s *DownloadService) downloadAni(ctx context.Context, ani *domain.Ani, chec
 		ani.Enable = false
 		_ = s.cfg.SaveAniList(s.cfg.AniList())
 		s.notifySend(ani, fmt.Sprintf("%s 订阅已完结", ani.Title), true, domain.NotifyCompleted)
-	}
-}
-
-// checkDownloadEnd 确认已提交离线下载的云端文件是否完成，
-// 完成的触发 DOWNLOAD_END 通知并移出待确认列表。
-// 网盘离线转存是异步的，AddOfflineTask 仅提交任务，文件完成由这里检测。
-func (s *DownloadService) checkDownloadEnd(ctx context.Context, ani *domain.Ani) {
-	if len(ani.PendingDownload) == 0 {
-		return
-	}
-	cfg := s.cfg.Get()
-	driver := s.Driver()
-	changed := false
-	for hash, pd := range ani.PendingDownload {
-		if ctx.Err() != nil {
-			return
-		}
-		if pd.Path == "" {
-			delete(ani.PendingDownload, hash)
-			changed = true
-			continue
-		}
-		exists, err := driver.FileExists(ctx, cfg, pd.Path)
-		if err != nil {
-			// 查询失败下一轮再试，不误报完成
-			continue
-		}
-		if !exists {
-			continue
-		}
-		delete(ani.PendingDownload, hash)
-		changed = true
-		s.logf("INFO", "download", "%s 下载完成: %s", ani.Title, filepath.Base(pd.Path))
-		s.notifySend(ani, filepath.Base(pd.Path), pd.Master, domain.NotifyDownloadEnd)
-	}
-	if changed {
-		if err := s.cfg.SaveAniList(s.cfg.AniList()); err != nil {
-			s.logf("ERROR", "download", "保存订阅失败: %v", err)
-		}
 	}
 }
 

@@ -195,9 +195,6 @@ func fillAniDefaults(a *domain.Ani) {
 	if a.NotDownload == nil {
 		a.NotDownload = []float64{}
 	}
-	if a.PendingDownload == nil {
-		a.PendingDownload = map[string]domain.PendingDownload{}
-	}
 	if a.CustomPriorityKeywords == nil {
 		a.CustomPriorityKeywords = []string{}
 	}
