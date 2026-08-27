@@ -8,6 +8,11 @@ export default defineConfig({
     environmentOptions: {
       jsdom: { url: 'http://localhost/' },
     },
+    // React 19.2.0+ 回归（facebook/react#37100）：DEV 构建在 Scheduler 任务
+    // 入口无条件读 window.event，Scheduler 任务跑在 setImmediate 上，会在 jsdom
+    // 环境销毁后触发 "window is not defined" 未处理异常，导致测试全过但 exit 1。
+    // 该错误仅来自环境 teardown 阶段、与测试断言无关，故忽略之。
+    dangerouslyIgnoreUnhandledErrors: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
     coverage: {
