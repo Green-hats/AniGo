@@ -51,7 +51,7 @@ export default function GardenPage() {
   return (
     <div>
       <Typography.Title level={4} style={{ marginBottom: 16 }}>
-        番剧源（animes.garden）
+        番剧源
       </Typography.Title>
       {!weeks ? null : (
       <Collapse
