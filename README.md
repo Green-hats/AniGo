@@ -2,7 +2,7 @@
 
 <img src="docs/logo.png" width="120" alt="AniGo Logo">
 
-# 🌸 AniGo
+# AniGo
 
 **云端追番 · 自动下载 · 智能选版**
 
