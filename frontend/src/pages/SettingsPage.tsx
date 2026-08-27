@@ -265,12 +265,6 @@ export default function SettingsPage() {
               >
                 <InputNumber min={0} max={168} style={{ width: '100%' }} />
               </Form.Item>
-              <Form.Item label="自动更新总集数" name="updateTotalEpisodeNumber" valuePropName="checked">
-                <Switch />
-              </Form.Item>
-              <Form.Item label="强制更新总集数" name="forceUpdateTotalEpisodeNumber" valuePropName="checked">
-                <Switch />
-              </Form.Item>
               <Divider />
               <Button type="primary" onClick={handleSave} loading={saving}>
                 保存

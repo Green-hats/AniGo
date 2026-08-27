@@ -232,6 +232,7 @@ func DefaultConfig() *Config {
 		CustomEpisodeGroupIndex:     2,
 		CustomEpisodeStr:            renameRegStr,
 		ProcrastinatingDay:          14,
+		UpdateTotalEpisodeNumber:    true,
 		DownloadTimeout:             60,
 		SortType:                    "SCORE",
 		LimitLoginAttempts:          true,
