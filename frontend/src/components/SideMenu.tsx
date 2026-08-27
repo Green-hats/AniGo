@@ -18,17 +18,13 @@ export default function SideMenu() {
     <Sider theme="dark" width={200}>
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
           color: '#fff',
           fontSize: 18,
           fontWeight: 600,
+          textAlign: 'center',
           padding: '16px 0',
         }}
       >
-        <img src="/favicon.svg" alt="AniGo" style={{ width: 28, height: 28 }} />
         AniGo
       </div>
       <Menu
