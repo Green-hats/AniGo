@@ -12,6 +12,7 @@
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
   <img src="https://img.shields.io/badge/status-stable-brightgreen" alt="Status">
+  <img src="https://github.com/Green-hats/AniGo/actions/workflows/ci.yml/badge.svg" alt="CI">
 </p>
 
 [快速开始](#-快速开始) · [核心特性](#-核心特性) · [使用流程](#-使用流程) · [配置指南](#-配置指南) · [项目结构](#-项目结构) · [测试](#-测试) · [架构设计](#-架构设计)
