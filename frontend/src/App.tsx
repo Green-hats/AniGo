@@ -47,6 +47,13 @@ function AuthShell() {
     }
   }, [])
 
+  // 会话过期（任意请求收到 401）时立即退出登录态，避免登录页跳转死循环。
+  useEffect(() => {
+    const onUnauthorized = () => setAuthed(false)
+    window.addEventListener('anigo:unauthorized', onUnauthorized)
+    return () => window.removeEventListener('anigo:unauthorized', onUnauthorized)
+  }, [])
+
   if (authed === null) {
     return <CenteredSpin />
   }

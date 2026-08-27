@@ -25,8 +25,14 @@ import type { Ani, PlayItem } from '../types'
 
 const { Text } = Typography
 
-// URL-safe base64（mpv-handler 协议要求）
-const b64u = (s: string) => btoa(s).replace(/\//g, '_').replace(/\+/g, '-').replace(/=/g, '')
+// URL-safe base64（mpv-handler 协议要求）。
+// btoa 只支持 Latin-1，中文文件名必须先用 TextEncoder 转成 UTF-8 字节再编码。
+const b64u = (s: string) => {
+  const bytes = new TextEncoder().encode(s)
+  let bin = ''
+  for (const b of bytes) bin += String.fromCharCode(b)
+  return btoa(bin).replace(/\//g, '_').replace(/\+/g, '-').replace(/=/g, '')
+}
 
 export default function HomePage() {
   const { data, refetch, isFetching } = useQuery({ queryKey: ['listAni'], queryFn: api.listAni })

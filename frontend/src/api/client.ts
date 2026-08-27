@@ -21,12 +21,12 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
 }
 
-// 401 时清空凭证并跳转登录页。
+// 401 时清空凭证并通知 App 进入未登录态（渲染登录页）。
+// 不直接改 hash：App 未登录分支对任意路由都渲染登录页，
+// 避免"登录页 → 重定向回首页 → 再次 401"的跳转死循环。
 function handleUnauthorized() {
   clearToken()
-  if (window.location.hash !== '#/login') {
-    window.location.hash = '#/login'
-  }
+  window.dispatchEvent(new Event('anigo:unauthorized'))
 }
 
 async function request<T>(method: string, url: string, body?: unknown, timeoutMs = DEFAULT_TIMEOUT): Promise<T> {
