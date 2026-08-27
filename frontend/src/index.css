@@ -6,7 +6,7 @@ body,
   font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
-/* 侧边栏：去掉 antd 默认蓝色选中态，改为中性灰 */
+/* 侧边栏：选中态淡天蓝色 */
 .anigo-sider .ant-menu-item {
   color: #595959;
 }
@@ -17,10 +17,14 @@ body,
 }
 
 .anigo-sider .ant-menu-item-selected {
-  color: #1f1f1f !important;
-  background: #f0f0f0 !important;
+  color: #0284c7 !important;
+  background: #e0f2fe !important;
+}
+
+.anigo-sider .ant-menu-item-selected .anticon {
+  color: #0284c7 !important;
 }
 
 .anigo-sider .ant-menu-item-selected::after {
-  border-inline-end: 2px solid #1f1f1f !important;
+  border-inline-end: 2px solid #0284c7 !important;
 }
