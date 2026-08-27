@@ -9,6 +9,7 @@ import (
 
 	"github.com/greenhats/anigo/internal/domain"
 	"github.com/greenhats/anigo/internal/provider/base"
+	"github.com/greenhats/anigo/internal/util"
 )
 
 // Garden 是 animes.garden 番剧源客户端。
@@ -70,6 +71,13 @@ func (g *Garden) Group(ctx context.Context, bgmID string) ([]*domain.AnimeGarden
 	}
 	if err := g.Get(ctx, apiHost+"/resources?"+params.Encode(), &body); err != nil {
 		return nil, err
+	}
+
+	// API 只返回字节数 size，这里补上人类可读的 formatSize
+	for i := range body.Resources {
+		if body.Resources[i].FormatSize == "" && body.Resources[i].Size > 0 {
+			body.Resources[i].FormatSize = util.FormatSize(body.Resources[i].Size)
+		}
 	}
 
 	// 按字幕组分桶

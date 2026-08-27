@@ -117,7 +117,7 @@ export default function GardenPage() {
             <List.Item>
               <List.Item.Meta
                 title={<Text style={{ fontSize: 13 }}>{it.title}</Text>}
-                description={`大小: ${it.formatSize ?? '未知'} · ${it.type ?? ''}`}
+                description={`大小: ${it.formatSize || '未知'} · ${it.type || ''}`}
               />
             </List.Item>
           )}
