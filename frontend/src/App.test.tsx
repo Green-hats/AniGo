@@ -35,7 +35,7 @@ describe('App', () => {
 
   it('渲染侧边导航与标题', async () => {
     renderApp()
-    expect(screen.getByText('🌸 anigo')).toBeInTheDocument()
+    expect(screen.getByText('🌸 AniGo')).toBeInTheDocument()
     expect(screen.getByText('我的订阅')).toBeInTheDocument()
     expect(screen.getByText('番剧源')).toBeInTheDocument()
     expect(screen.getByText('日志')).toBeInTheDocument()

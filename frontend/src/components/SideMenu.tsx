@@ -25,7 +25,7 @@ export default function SideMenu() {
           padding: '16px 0',
         }}
       >
-        🌸 anigo
+        🌸 AniGo
       </div>
       <Menu
         theme="dark"

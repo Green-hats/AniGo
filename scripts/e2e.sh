@@ -39,7 +39,7 @@ echo "=== 1. 基础 API ==="
 check "ping" "200" "$(curl -s http://127.0.0.1:$PORT/api/ping | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')"
 
 echo "=== 2. 前端页面 (单二进制) ==="
-check "首页 title" "anigo - 云端追番" "$(curl -s http://127.0.0.1:$PORT/ | grep -oP '(?<=<title>)[^<]*')"
+check "首页 title" "AniGo - 云端追番" "$(curl -s http://127.0.0.1:$PORT/ | grep -oP '(?<=<title>)[^<]*')"
 check "SPA 路由兜底" "200" "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT/home)"
 
 echo "=== 3. 配置 ==="
