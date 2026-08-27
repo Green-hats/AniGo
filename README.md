@@ -35,6 +35,16 @@
 | 📦 **单二进制** | 前端 React 构建产物嵌入后端，一个 `anigo` 搞定 |
 | 📱 **多设备** | 服务器部署，任意设备浏览器访问管理 |
 
+## 界面预览
+
+| 首页（我的订阅） | 番剧源 |
+| --- | --- |
+| ![首页](docs/screenshots/home.png) | ![番剧源](docs/screenshots/garden.png) |
+
+| 设置 | 日志 |
+| --- | --- |
+| ![设置](docs/screenshots/settings.png) | ![日志](docs/screenshots/logs.png) |
+
 ## 快速开始
 
 ### 环境要求
