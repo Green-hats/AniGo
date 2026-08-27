@@ -57,9 +57,6 @@ jobs:
           mkdir -p internal/httpapi/static
           cp -r ../frontend/dist/. internal/httpapi/static/
 
-      - name: Generate secrets stub
-        run: bash scripts/gen_secrets_stub.sh
-
       - name: Cross-compile
         env:
           CGO_ENABLED: '0'

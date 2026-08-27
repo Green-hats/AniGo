@@ -206,7 +206,7 @@ ${emoji}${emoji}${emoji}`
 func DefaultConfig() *Config {
 	return &Config{
 		DownloadToolType:            "115",
-		Pan115Cookie:                defaultPan115Cookie(),
+		Pan115Cookie:                "",
 		DownloadRetry:               3,
 		DownloadPathTemplate:        "番剧/${title}/Season ${season}",
 		OvaDownloadPathTemplate:     "剧场版/${title}",
@@ -234,7 +234,7 @@ func DefaultConfig() *Config {
 		BgmRefreshHours:             6,
 		AiEnabled:                   true,
 		AiProvider:                  "deepseek",
-		AiApiKey:                    defaultAiApiKey(),
+		AiApiKey:                    "",
 		AiBaseURL:                   "https://api.deepseek.com",
 		AiModel:                     "deepseek-v4-flash",
 		AiPrompt:                    defaultAiPrompt,

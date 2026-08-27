@@ -21,6 +21,3 @@ backend/internal/httpapi/static/
 
 # 测试临时文件
 /tmp/anigo-test
-
-# 密钥文件（不提交）
-backend/internal/domain/secrets.go

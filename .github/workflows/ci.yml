@@ -18,9 +18,6 @@ jobs:
           go-version: '1.26'
           cache-dependency-path: backend/go.sum
 
-      - name: Generate secrets stub
-        run: bash scripts/gen_secrets_stub.sh
-
       - name: Prepare static embed placeholder
         run: |
           mkdir -p backend/internal/httpapi/static
