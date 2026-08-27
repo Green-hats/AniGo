@@ -6,7 +6,7 @@
 
 **云端追番 · 自动下载 · 智能选版**
 
-订阅动画 RSS，AI 智能解析，自动离线下载到网盘，通知推送，多设备管理。**全程不占本地硬盘，单二进制部署。**
+订阅动画 RSS，AI 智能解析，自动离线下载到网盘，通知推送。**全程不占本地硬盘，单二进制部署。**
 
 <p align="center">
   <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" alt="Go">
@@ -51,7 +51,6 @@
     <tr><td align="center"><b>元数据</b></td><td>Bangumi 评分 / 季数 / 总集数、封面下载</td></tr>
     <tr><td align="center"><b>通知</b></td><td>Telegram / Bark / ServerChan / WebHook / Shell / 系统日志</td></tr>
     <tr><td align="center"><b>单二进制</b></td><td>前端 React 构建产物嵌入后端，一个 <code>anigo</code> 搞定</td></tr>
-    <tr><td align="center"><b>多设备</b></td><td>服务器部署，任意设备浏览器访问管理</td></tr>
   </tbody>
 </table>
 
