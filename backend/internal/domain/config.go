@@ -36,8 +36,6 @@ const (
 type NotificationTypeEnum string
 
 const (
-	NotifyEmbyRefresh NotificationTypeEnum = "EMBY_REFRESH"
-	NotifyMail        NotificationTypeEnum = "MAIL"
 	NotifyServerChan  NotificationTypeEnum = "SERVER_CHAN"
 	NotifySystem      NotificationTypeEnum = "SYSTEM"
 	NotifyTelegram    NotificationTypeEnum = "TELEGRAM"
@@ -61,14 +59,6 @@ type NotificationConfig struct {
 	Comment              string                 `json:"comment"`
 	NotificationTemplate string                 `json:"notificationTemplate"`
 	NotificationType     NotificationTypeEnum   `json:"notificationType"`
-	MailSMTPHost         string                 `json:"mailSMTPHost"`
-	MailSMTPPort         int                    `json:"mailSMTPPort"`
-	MailFrom             string                 `json:"mailFrom"`
-	MailPassword         string                 `json:"mailPassword"`
-	MailSSLEnable        bool                   `json:"mailSSLEnable"`
-	MailTLSEnable        bool                   `json:"mailTLSEnable"`
-	MailAddressee        string                 `json:"mailAddressee"`
-	MailImage            bool                   `json:"mailImage"`
 	ServerChanType       ServerChanTypeEnum     `json:"serverChanType"`
 	ServerChanSendKey    string                 `json:"serverChanSendKey"`
 	ServerChan3ApiUrl    string                 `json:"serverChan3ApiUrl"`
@@ -82,9 +72,6 @@ type NotificationConfig struct {
 	WebHookUrl           string                 `json:"webHookUrl"`
 	WebHookHeader        string                 `json:"webHookHeader"`
 	WebHookBody          string                 `json:"webHookBody"`
-	EmbyHost             string                 `json:"embyHost"`
-	EmbyApiKey           string                 `json:"embyApiKey"`
-	EmbyRefreshViewIds   string                 `json:"embyRefreshViewIds"`
 	Shell                string                 `json:"shell"`
 	BarkServerUrl        string                 `json:"barkServerUrl"`
 	BarkDeviceKeys       string                 `json:"barkDeviceKeys"`

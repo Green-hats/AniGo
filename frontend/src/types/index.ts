@@ -20,14 +20,6 @@ export interface NotificationConfig {
   comment: string
   notificationTemplate: string
   notificationType: string
-  mailSMTPHost: string
-  mailSMTPPort: number
-  mailFrom: string
-  mailPassword: string
-  mailSSLEnable: boolean
-  mailTLSEnable: boolean
-  mailAddressee: string
-  mailImage: boolean
   serverChanType: string
   serverChanSendKey: string
   serverChan3ApiUrl: string
@@ -41,9 +33,6 @@ export interface NotificationConfig {
   webHookUrl: string
   webHookHeader: string
   webHookBody: string
-  embyHost: string
-  embyApiKey: string
-  embyRefreshViewIds: string
   shell: string
   barkServerUrl: string
   barkDeviceKeys: string
