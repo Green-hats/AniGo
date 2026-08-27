@@ -294,15 +294,16 @@ func (t *TaskManager) Start() {
     t.ctx, t.cancel = context.WithCancel(context.Background())
     t.wg.Add(2)
     go t.runRSSLoop()   // 每 RssSleepMinutes 分钟
-    go t.runBgmLoop()   // 每 bgmRefreshInterval（6h）刷新 Bangumi 元数据
+    go t.runBgmLoop()   // 每 bgmRefreshHours（默认 6h）刷新 Bangumi 元数据
 }
 func (t *TaskManager) Stop() { t.cancel(); t.wg.Wait() }
 ```
 
 - 每个循环内部用 `select { case <-ctx.Done(): return; case <-time.After(d): }`
 - 循环内每轮调用 service 时也透传 ctx，可被优雅中断
-- `runBgmLoop` 每 6 小时调用 `MetadataService.RefreshAll` 刷新订阅的评分/总集数/已播出集数/封面（受 `UpdateTotalEpisodeNumber` / `ForceUpdateTotalEpisodeNumber` 配置控制）
+- `runBgmLoop` 按配置 `bgmRefreshHours`（小时，缺省 6）调用 `MetadataService.RefreshAll` 刷新订阅的评分/总集数/已播出集数/封面（受 `UpdateTotalEpisodeNumber` / `ForceUpdateTotalEpisodeNumber` 配置控制）
 - `DownloadService.DownloadAni` / `SyncDownload` 透传 ctx 并在条目循环内检查 `ctx.Err()`，下载进行中收到 SIGTERM 时 `Stop()` 不会阻塞，可优雅中断
+- 离线下载是异步转存：`AddOfflineTask` 提交后记录到 `Ani.PendingDownload`，每轮 `downloadAni` 经 `checkDownloadEnd` 探测云端文件出现，完成后移除并触发 `DOWNLOAD_END` 通知
 
 ## 8. HTTP 层（Gin）
 

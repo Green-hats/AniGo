@@ -165,6 +165,8 @@ type Config struct {
 	BgmApi                         string                `json:"bgmApi"`
 	AllowCors                      bool                  `json:"allowCors"`
 	UUID                           string                `json:"uuid"`
+	// BgmRefreshHours BGM 元数据后台刷新周期（小时）。
+	BgmRefreshHours                int                   `json:"bgmRefreshHours"`
 	// AI 设置：用云端大模型解析/过滤 RSS 标题
 	AiEnabled   bool   `json:"aiEnabled"`
 	AiProvider  string `json:"aiProvider"`
@@ -244,6 +246,7 @@ func DefaultConfig() *Config {
 		LimitLoginAttempts:          true,
 		ReverseProxyTrustIpList:     []string{"127.0.0.1"},
 		BgmApi:                      "https://api.bgm.tv",
+		BgmRefreshHours:             6,
 		AiEnabled:                   true,
 		AiProvider:                  "deepseek",
 		AiApiKey:                    defaultAiApiKey(),

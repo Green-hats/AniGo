@@ -118,6 +118,8 @@ export interface Config {
   bgmApi: string
   allowCors: boolean
   uuid: string
+  // BGM 元数据后台刷新周期（小时）
+  bgmRefreshHours: number
   // AI 设置
   aiEnabled: boolean
   aiProvider: string

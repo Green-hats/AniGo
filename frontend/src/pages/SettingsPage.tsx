@@ -215,6 +215,20 @@ export default function SettingsPage() {
                 <Select mode="tags" placeholder="输入排除正则后回车" />
               </Form.Item>
               <Divider />
+              <Form.Item
+                label="BGM 刷新间隔（小时）"
+                name="bgmRefreshHours"
+                extra="后台定期刷新订阅的评分/总集数/封面，0 使用默认 6 小时。"
+              >
+                <InputNumber min={0} max={168} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item label="自动更新总集数" name="updateTotalEpisodeNumber" valuePropName="checked">
+                <Switch />
+              </Form.Item>
+              <Form.Item label="强制更新总集数" name="forceUpdateTotalEpisodeNumber" valuePropName="checked">
+                <Switch />
+              </Form.Item>
+              <Divider />
               <Button type="primary" onClick={handleSave} loading={saving}>
                 保存
               </Button>
