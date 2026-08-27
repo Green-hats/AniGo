@@ -15,7 +15,7 @@ export default function SideMenu() {
   const selected = '/' + (loc.pathname.split('/')[1] || 'home')
 
   return (
-    <Sider width={200} style={{ background: '#fff', borderRight: '1px solid #f0f0f0' }}>
+    <Sider width={200} className="anigo-sider" style={{ background: '#fff', borderRight: '1px solid #f0f0f0' }}>
       <div
         style={{
           color: '#1f1f1f',

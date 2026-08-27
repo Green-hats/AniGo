@@ -5,3 +5,22 @@ body,
   height: 100%;
   font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
+
+/* 侧边栏：去掉 antd 默认蓝色选中态，改为中性灰 */
+.anigo-sider .ant-menu-item {
+  color: #595959;
+}
+
+.anigo-sider .ant-menu-item:hover {
+  color: #1f1f1f;
+  background: #f5f5f5 !important;
+}
+
+.anigo-sider .ant-menu-item-selected {
+  color: #1f1f1f !important;
+  background: #f0f0f0 !important;
+}
+
+.anigo-sider .ant-menu-item-selected::after {
+  border-inline-end: 2px solid #1f1f1f !important;
+}
