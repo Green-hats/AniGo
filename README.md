@@ -15,13 +15,13 @@
   <img src="https://github.com/Green-hats/AniGo/actions/workflows/ci.yml/badge.svg" alt="CI">
 </p>
 
-[快速开始](#-快速开始) · [核心特性](#-核心特性) · [使用流程](#-使用流程) · [配置指南](#-配置指南) · [项目结构](#-项目结构) · [测试](#-测试) · [架构设计](#-架构设计)
+[快速开始](#快速开始) · [核心特性](#核心特性) · [使用流程](#使用流程) · [配置指南](#配置指南) · [项目结构](#项目结构) · [测试](#测试) · [架构设计](#架构设计)
 
 </div>
 
 ---
 
-## ✨ 核心特性
+## 核心特性
 
 | 能力 | 说明 |
 | --- | --- |
@@ -35,7 +35,7 @@
 | 📦 **单二进制** | 前端 React 构建产物嵌入后端，一个 `anigo` 搞定 |
 | 📱 **多设备** | 服务器部署，任意设备浏览器访问管理 |
 
-## 🚀 快速开始
+## 快速开始
 
 ### 环境要求
 
@@ -76,7 +76,7 @@ CONFIG=/path ./backend/bin/anigo  # 自定义配置目录
 make dev    # 后端 :7789 + Vite 热更新 :37789（/api 自动代理）
 ```
 
-## 🔄 使用流程
+## 使用流程
 
 ```
 ① 一次性配置：115 Cookie、AI Key、通知渠道
@@ -98,7 +98,7 @@ make dev    # 后端 :7789 + Vite 热更新 :37789（/api 自动代理）
 2. 前端通过本地 `/api/file` 代理转发 115 CDN 流（自动带 115 UA 取流），播放器只访问本地端点，不暴露云端地址
 3. 播放列表有 30 秒短缓存，避免频繁遍历 115 目录
 
-## ⚙️ 配置指南
+## 配置指南
 
 ### AI 解析（可选，默认开启）
 
@@ -158,7 +158,7 @@ ${bgmId} ${jpTitle} ${subgroup}
 - **模板**：`${text} ${title} ${season} ${episode} ${emoji} ${action}` 等
 - **重试次数、排序、备注**
 
-## 🗂️ 项目结构
+## 项目结构
 
 ```
 anigo/
@@ -184,7 +184,7 @@ anigo/
 └── go.work                   # Go workspace（backend 模块）
 ```
 
-## 🧪 测试
+## 测试
 
 ```bash
 make test                      # 后端：go vet ./... && go test ./...
@@ -198,7 +198,7 @@ make e2e                       # 端到端集成测试（需真实外部服务�
 - **前端测试**：API client（mock fetch 验证请求/错误处理）、App 路由渲染、SideMenu 导航
 - **E2E**：基础 API / 配置 / AI / 元数据 / RSS 解析 / 订阅管理 / 115 登录 / 通知 / 导出导入
 
-## 🏗️ 架构设计
+## 架构设计
 
 - **端口-适配器（Hexagonal）**：业务逻辑只依赖 `domain/ports.go` 的接口，网盘/元数据/通知/AI 全部可插拔
 - **手动依赖注入**：main 是唯一组装点，无全局单例
@@ -216,15 +216,15 @@ make e2e                       # 端到端集成测试（需真实外部服务�
 
 > 详见 [`docs/architecture.md`](docs/architecture.md) 与 [`docs/pipeline.md`](docs/pipeline.md)。
 
-## 📄 免责声明
+## 免责声明
 
 本工具为中立性技术辅助工具，请遵守当地法律法规，勿用于盗版传播。
 
-## 📜 License
+## License
 
 [GNU General Public License v3.0](LICENSE)（GPL-3.0）。
 
-## 🤝 致谢
+## 致谢
 
 - [ani-rss](https://github.com/wushuo894/ani-rss) — 思路与契约格式来源
 - [mpv-handler](https://github.com/akiirui/mpv-handler) — 在线播放协议
