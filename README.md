@@ -23,15 +23,13 @@
 
 ## 界面预览
 
-<p align="center">
-  <img src="docs/screenshots/home.png" width="500" alt="首页 · 我的订阅">
-</p>
+| 首页 · 我的订阅 | 番剧源 |
+| :---: | :---: |
+| <img src="docs/screenshots/home.png" width="400" alt="首页"> | <img src="docs/screenshots/garden.png" width="400" alt="番剧源"> |
 
-<p align="center">
-  <img src="docs/screenshots/garden.png" width="290" alt="番剧源">
-  <img src="docs/screenshots/settings.png" width="290" alt="设置">
-  <img src="docs/screenshots/logs.png" width="290" alt="日志">
-</p>
+| 设置 | 日志 |
+| :---: | :---: |
+| <img src="docs/screenshots/settings.png" width="400" alt="设置"> | <img src="docs/screenshots/logs.png" width="400" alt="日志"> |
 
 ## 核心特性
 
