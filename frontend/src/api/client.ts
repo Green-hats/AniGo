@@ -3,18 +3,33 @@ import type { Result } from '../types'
 // 后端统一返回 {code, message, data, t}
 const BASE = ''
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
+// 默认请求超时（毫秒），避免后端接口卡住时 UI 无限等待。
+const DEFAULT_TIMEOUT = 30_000
+
+async function request<T>(method: string, url: string, body?: unknown, timeoutMs = DEFAULT_TIMEOUT): Promise<T> {
   const opts: RequestInit = { method, headers: {} }
   if (body !== undefined) {
     opts.headers = { 'Content-Type': 'application/json' }
     opts.body = JSON.stringify(body)
   }
-  const resp = await fetch(BASE + url, opts)
-  const json = (await resp.json()) as Result<T>
-  if (json.code !== 200) {
-    throw new Error(json.message)
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+  opts.signal = ctrl.signal
+  try {
+    const resp = await fetch(BASE + url, opts)
+    const json = (await resp.json()) as Result<T>
+    if (json.code !== 200) {
+      throw new Error(json.message)
+    }
+    return json.data
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') {
+      throw new Error('请求超时')
+    }
+    throw e
+  } finally {
+    clearTimeout(timer)
   }
-  return json.data
 }
 
 export const api = {

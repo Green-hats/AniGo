@@ -57,60 +57,6 @@ type BgmEpisode struct {
 	DurationSeconds int    `json:"durationSeconds"`
 }
 
-// MikanSeason 描述一个可选择的季度。
-type MikanSeason struct {
-	Year        int    `json:"year"`
-	Season      string `json:"season"`
-	SeasonLabel string `json:"seasonLabel"`
-	Select      bool   `json:"select"`
-}
-
-// MikanWeek 按周标签分组 MikanInfo。
-type MikanWeek struct {
-	WeekLabel string      `json:"weekLabel"`
-	Items     []MikanInfo `json:"items"`
-}
-
-// MikanInfo 是 Mikan 列表中的一条番剧。
-type MikanInfo struct {
-	BgmId  int          `json:"bgmId"`
-	Cover  string       `json:"cover"`
-	URL    string       `json:"url"`
-	Exists bool         `json:"exists"`
-	Score  float64      `json:"score"`
-	Title  string       `json:"title"`
-	BgmUrl string       `json:"bgmUrl"`
-	Groups []MikanGroup `json:"groups"`
-}
-
-// MikanGroup 是一个字幕组及其 RSS。
-type MikanGroup struct {
-	SubgroupId string      `json:"subgroupId"`
-	Label      string      `json:"label"`
-	Rss        string      `json:"rss"`
-	BgmUrl     string      `json:"bgmUrl"`
-	UpdateDay  string      `json:"updateDay"`
-	Items      []MikanItem `json:"items"`
-	GroupRegex GroupRegex  `json:"groupRegex"`
-}
-
-// MikanItem 是字幕组页面上的一条发布。
-type MikanItem struct {
-	Title      string   `json:"title"`
-	Magnet     string   `json:"magnet"`
-	Size       int64    `json:"size"`
-	FormatSize string   `json:"formatSize"`
-	CreatedAt  DateTime `json:"createdAt"`
-	Torrent    string   `json:"torrent"`
-}
-
-// Mikan 是搜索/列表结果页模型。
-type Mikan struct {
-	Seasons   []MikanSeason `json:"seasons"`
-	Weeks     []MikanWeek   `json:"weeks"`
-	TotalItem int           `json:"totalItem"`
-}
-
 // GroupRegex 是字幕组过滤规则。
 type GroupRegex struct {
 	RegexList [][]GroupRegexItem `json:"regexList"`

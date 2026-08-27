@@ -85,7 +85,6 @@ type NotificationConfig struct {
 
 // Config 是应用根配置，持久化为 config.v2.json。
 type Config struct {
-	MikanHost                      string                `json:"mikanHost"`
 	DownloadToolType               string                `json:"downloadToolType"`
 	DownloadRetry                  int                   `json:"downloadRetry"`
 	PikpakEmail                    string                `json:"pikpakEmail"`
@@ -206,7 +205,6 @@ ${emoji}${emoji}${emoji}`
 // DefaultConfig 返回与遗留 ConfigUtil 静态块一致的默认配置。
 func DefaultConfig() *Config {
 	return &Config{
-		MikanHost:                   "https://mikanani.me",
 		DownloadToolType:            "115",
 		Pan115Cookie:                defaultPan115Cookie(),
 		DownloadRetry:               3,

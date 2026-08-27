@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Tabs, Form, Input, Switch, InputNumber, Button, Divider, message, Space, Select, Card } from 'antd'
-import { DeleteOutlined, PlusOutlined, SendOutlined } from '@ant-design/icons'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Tabs, Form, Input, Switch, InputNumber, Button, Divider, message, Space, Select, Card, Upload } from 'antd'
+import { DeleteOutlined, PlusOutlined, SendOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons'
 import { api } from '../api/client'
 import type { Config, NotificationConfig } from '../types'
 
@@ -140,6 +140,7 @@ function renderChannelFields(name: number, type?: string) {
 
 export default function SettingsPage() {
   const { data: cfg } = useQuery({ queryKey: ['config'], queryFn: api.getConfig })
+  const queryClient = useQueryClient()
   const [form] = Form.useForm<Config>()
   const [saving, setSaving] = useState(false)
 
@@ -175,6 +176,36 @@ export default function SettingsPage() {
       message.success('115 登录成功')
     } catch (e) {
       message.error(`115 登录失败: ${(e as Error).message}`)
+    }
+  }
+
+  const handleExport = async () => {
+    try {
+      const resp = await api.exportConfig()
+      const blob = await resp.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'anigo.backup.zip'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      message.error(`导出失败: ${(e as Error).message}`)
+    }
+  }
+
+  const handleImport = async (file: File) => {
+    setSaving(true)
+    try {
+      const resp = await api.importConfig(file)
+      const json = (await resp.json()) as { code: number; message: string }
+      if (json.code !== 200) throw new Error(json.message)
+      message.success('导入成功，配置已重新加载')
+      await queryClient.invalidateQueries()
+    } catch (e) {
+      message.error(`导入失败: ${(e as Error).message}`)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -228,6 +259,23 @@ export default function SettingsPage() {
               <Form.Item label="强制更新总集数" name="forceUpdateTotalEpisodeNumber" valuePropName="checked">
                 <Switch />
               </Form.Item>
+              <Divider />
+              <Card size="small" title="备份与恢复">
+                <Space>
+                  <Button icon={<DownloadOutlined />} onClick={handleExport}>
+                    导出备份
+                  </Button>
+                  <Upload
+                    showUploadList={false}
+                    beforeUpload={(file) => {
+                      handleImport(file as File)
+                      return false
+                    }}
+                  >
+                    <Button icon={<UploadOutlined />}>导入备份</Button>
+                  </Upload>
+                </Space>
+              </Card>
               <Divider />
               <Button type="primary" onClick={handleSave} loading={saving}>
                 保存

@@ -83,14 +83,9 @@ func (t *TaskManager) runRSSLoop() {
 // runBgmLoop 每 N 小时刷新一轮订阅的 Bangumi 元数据（评分/总集数/封面）。
 // 周期取配置 bgmRefreshHours，未配置时回退到默认值。
 // 与 runRSSLoop 独立，避免单次元数据请求阻塞下载同步。
+// 启动即刷新一轮（元数据尽快就位），之后按周期循环。
 func (t *TaskManager) runBgmLoop() {
 	defer t.wg.Done()
-	// 首次启动延迟一轮，避免与 RSS 同步同时抢资源
-	select {
-	case <-t.ctx.Done():
-		return
-	case <-time.After(10 * time.Minute):
-	}
 	for {
 		if t.meta != nil && t.ctx.Err() == nil {
 			t.meta.RefreshAll(t.ctx, t.cfg.AniList())

@@ -45,7 +45,6 @@ export interface NotificationConfig {
 }
 
 export interface Config {
-  mikanHost: string
   downloadToolType: string
   downloadRetry: number
   pan115Cookie: string

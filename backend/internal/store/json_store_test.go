@@ -33,8 +33,8 @@ func TestLoadConfigCreatesDefault(t *testing.T) {
 		t.Fatalf("LoadConfig: %v", err)
 	}
 	def := domain.DefaultConfig()
-	if c.MikanHost != def.MikanHost {
-		t.Errorf("MikanHost = %q, want default %q", c.MikanHost, def.MikanHost)
+	if c.BgmApi != def.BgmApi {
+		t.Errorf("BgmApi = %q, want default %q", c.BgmApi, def.BgmApi)
 	}
 	if c.UUID == "" {
 		t.Error("UUID 应为非空")
@@ -46,7 +46,7 @@ func TestLoadConfigCreatesDefault(t *testing.T) {
 
 func TestSaveLoadConfigRoundTrip(t *testing.T) {
 	s := NewJSONStore(t.TempDir())
-	want := &domain.Config{MikanHost: "https://example.com", RssSleepMinutes: 5, Exclude: []string{"x"}, Login: domain.Login{Username: "u", Password: "p"}}
+	want := &domain.Config{BgmApi: "https://api.example.com", RssSleepMinutes: 5, Exclude: []string{"x"}, Login: domain.Login{Username: "u", Password: "p"}}
 	if err := s.SaveConfig(want); err != nil {
 		t.Fatalf("SaveConfig: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestSaveLoadConfigRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	if got.MikanHost != want.MikanHost || got.RssSleepMinutes != want.RssSleepMinutes {
+	if got.BgmApi != want.BgmApi || got.RssSleepMinutes != want.RssSleepMinutes {
 		t.Errorf("读回不一致: %+v", got)
 	}
 	if len(got.Exclude) != 1 || got.Exclude[0] != "x" {
@@ -70,7 +70,7 @@ func TestLoadConfigFillsMissingFields(t *testing.T) {
 	path := filepath.Join(dir, ConfigFile)
 	// 写入一个只含部分字段的文件
 	partial := map[string]interface{}{
-		"mikanHost": "https://partial.example",
+		"bgmApi": "https://partial.example",
 		"rssSleepMinutes": 30,
 	}
 	b, _ := json.Marshal(partial)
@@ -82,8 +82,8 @@ func TestLoadConfigFillsMissingFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	if c.MikanHost != "https://partial.example" {
-		t.Errorf("保留已有字段失败: %q", c.MikanHost)
+	if c.BgmApi != "https://partial.example" {
+		t.Errorf("保留已有字段失败: %q", c.BgmApi)
 	}
 	def := domain.DefaultConfig()
 	if c.RssSleepMinutes != 30 {
@@ -162,7 +162,7 @@ func TestFillAniDefaults(t *testing.T) {
 func TestLoadConfigKeepsNilSlicesEmpty(t *testing.T) {
 	// 旧文件可能序列化了 null，加载后应为 [] 而非 nil
 	s := NewJSONStore(t.TempDir())
-	c := &domain.Config{MikanHost: "h"}
+	c := &domain.Config{BgmApi: "h"}
 	if err := s.SaveConfig(c); err != nil {
 		t.Fatalf("SaveConfig: %v", err)
 	}

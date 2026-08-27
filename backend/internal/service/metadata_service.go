@@ -171,6 +171,7 @@ func (s *MetadataService) RefreshAll(ctx context.Context, list []*domain.Ani) {
 			if cover := s.SaveCover(image); cover != "" {
 				ani.Cover = cover
 			}
+			changed = true
 		}
 		if info.Rating.Score != 0 && info.Rating.Score != ani.Score {
 			ani.Score = info.Rating.Score

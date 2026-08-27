@@ -67,4 +67,23 @@ describe('api client', () => {
     await api.batchEnable(['id1'], true)
     expect(mockFetch.mock.calls[0][0]).toBe('/api/batchEnable?value=true')
   })
+
+  it('请求超时抛出"请求超时"', async () => {
+    vi.useFakeTimers()
+    try {
+      mockFetch.mockImplementation(
+        (_url: string, opts: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            opts.signal?.addEventListener('abort', () =>
+              reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+            )
+          }),
+      )
+      const p = api.ping()
+      vi.advanceTimersByTime(30_001)
+      await expect(p).rejects.toThrow('请求超时')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

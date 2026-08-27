@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/greenhats/anigo/internal/domain"
@@ -52,8 +54,10 @@ func (s *Server) handlePlayList(c *gin.Context) {
 }
 
 // handleRefreshAll 触发一轮全部订阅刷新。
+// 手动刷新是"发起即返回"的用户操作，须用与请求无关的 ctx，
+// 否则 handler 返回后请求 ctx 被取消，后台刷新会立即中止。
 func (s *Server) handleRefreshAll(c *gin.Context) {
-	go s.download.SyncDownload(c.Request.Context(), s.cfg.AniList())
+	go s.download.SyncDownload(context.Background(), s.cfg.AniList())
 	okMsg(c, "已开始刷新RSS")
 }
 
@@ -68,7 +72,7 @@ func (s *Server) handleRefreshAni(c *gin.Context) {
 		fail(c, "订阅不存在")
 		return
 	}
-	go s.download.DownloadAni(c.Request.Context(), ani)
+	go s.download.DownloadAni(context.Background(), ani)
 	okMsg(c, "已开始刷新RSS")
 }
 

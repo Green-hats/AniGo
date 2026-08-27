@@ -75,13 +75,6 @@ func (s *ConfigService) SetConfigRaw(raw []byte) error {
 	return s.store.SaveConfig(cur)
 }
 
-// Sync 持久化当前配置。
-func (s *ConfigService) Sync() error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.store.SaveConfig(s.cfg)
-}
-
 // AniList 返回订阅列表。
 func (s *ConfigService) AniList() []*domain.Ani {
 	s.mu.RLock()

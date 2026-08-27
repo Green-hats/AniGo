@@ -36,7 +36,6 @@ type PendingDownload struct {
 type Ani struct {
 	Sort                         int          `json:"sort"`
 	ID                           string       `json:"id"`
-	MikanTitle                   string       `json:"mikanTitle"`
 	URL                          string       `json:"url"`
 	StandbyRssList               []StandbyRss `json:"standbyRssList"`
 	Title                        string       `json:"title"`
