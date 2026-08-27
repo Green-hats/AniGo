@@ -272,23 +272,6 @@ export default function SettingsPage() {
                 <Switch />
               </Form.Item>
               <Divider />
-              <Card size="small" title="备份与恢复">
-                <Space>
-                  <Button icon={<DownloadOutlined />} onClick={handleExport}>
-                    导出备份
-                  </Button>
-                  <Upload
-                    showUploadList={false}
-                    beforeUpload={(file) => {
-                      handleImport(file as File)
-                      return false
-                    }}
-                  >
-                    <Button icon={<UploadOutlined />}>导入备份</Button>
-                  </Upload>
-                </Space>
-              </Card>
-              <Divider />
               <Button type="primary" onClick={handleSave} loading={saving}>
                 保存
               </Button>
@@ -509,6 +492,59 @@ export default function SettingsPage() {
               <Button type="primary" htmlType="submit" loading={saving}>
                 保存
               </Button>
+            </Form>
+          ),
+        },
+        {
+          key: 'logs',
+          label: '日志与备份',
+          children: (
+            <Form form={form} layout="vertical" style={{ maxWidth: 600 }}>
+              <Form.Item
+                label="日志级别"
+                name="logsLevel"
+                tooltip="低于该级别的日志不记录（内存与落盘均过滤）。"
+              >
+                <Select
+                  options={[
+                    { value: 'DEBUG', label: 'DEBUG' },
+                    { value: 'INFO', label: 'INFO' },
+                    { value: 'WARN', label: 'WARN' },
+                    { value: 'ERROR', label: 'ERROR' },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item
+                label="日志落盘文件"
+                name="logsFile"
+                tooltip="相对配置目录的路径（如 logs/anigo.log），留空则不落盘。日志重启后仍可回溯。"
+              >
+                <Input placeholder="留空不落盘" />
+              </Form.Item>
+              <Form.Item label="内存日志条数" name="logsMax" tooltip="日志页可查看的内存环形缓冲容量。">
+                <InputNumber min={1} max={100000} style={{ width: '100%' }} />
+              </Form.Item>
+              <Divider />
+              <Button type="primary" onClick={handleSave} loading={saving}>
+                保存
+              </Button>
+              <Divider />
+              <Card size="small" title="备份与恢复">
+                <Space>
+                  <Button icon={<DownloadOutlined />} onClick={handleExport}>
+                    导出备份
+                  </Button>
+                  <Upload
+                    showUploadList={false}
+                    beforeUpload={(file) => {
+                      handleImport(file as File)
+                      return false
+                    }}
+                  >
+                    <Button icon={<UploadOutlined />}>导入备份</Button>
+                  </Upload>
+                </Space>
+              </Card>
             </Form>
           ),
         },

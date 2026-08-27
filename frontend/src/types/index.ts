@@ -71,6 +71,8 @@ export interface Config {
   standbyRss: boolean
   coexist: boolean
   logsMax: number
+  logsLevel: string
+  logsFile: string
   debug: boolean
   procrastinatingMasterOnly: boolean
   proxy: boolean

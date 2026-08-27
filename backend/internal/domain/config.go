@@ -104,6 +104,10 @@ type Config struct {
 	StandbyRss                     bool                  `json:"standbyRss"`
 	Coexist                        bool                  `json:"coexist"`
 	LogsMax                        int                   `json:"logsMax"`
+	// LogsLevel 日志级别（DEBUG/INFO/WARN/ERROR），低于该级别的日志不记录。
+	LogsLevel string `json:"logsLevel"`
+	// LogsFile 日志落盘文件路径（相对配置目录，空表示不落盘）。
+	LogsFile string `json:"logsFile"`
 	Debug                          bool                  `json:"debug"`
 	ProcrastinatingMasterOnly      bool                  `json:"procrastinatingMasterOnly"`
 	Proxy                          bool                  `json:"proxy"`
@@ -216,6 +220,8 @@ func DefaultConfig() *Config {
 		RssTimeout:                  20,
 		Skip5:                       true,
 		LogsMax:                     128,
+		LogsLevel:                   "INFO",
+		LogsFile:                    "",
 		ProcrastinatingMasterOnly:   true,
 		ProxyPort:                   8080,
 		Login:                       Login{Username: "admin", Password: md5Hex("admin")},

@@ -118,7 +118,7 @@ CONFIG=/data/anigo ./anigo-linux-amd64  # 自定义配置目录
 
 Windows 直接运行 `anigo-windows-amd64.exe`（参数相同）。首次启动自动生成配置，浏览器打开 `http://服务器:7789`，默认账号 `admin` / `admin`。
 
-产生文件（均在配置目录）：`config.v2.json`（主配置）、`ani.v2.json`（订阅列表）、`files/`（封面缓存）；日志在内存中，视频全部离线下载到 115 云盘，本地零存储。
+产生文件（均在配置目录）：`config.v2.json`（主配置）、`ani.v2.json`（订阅列表）、`files/`（封面缓存）、`logs/`（可选日志落盘）；日志默认在内存中，视频全部离线下载到 115 云盘，本地零存储。
 
 > [!NOTE]
 > 发布版二进制内嵌的默认密钥为空，需在网页「设置」里自行填入 115 Cookie 与 AI Key。
@@ -146,7 +146,8 @@ ${bgmId} ${jpTitle} ${subgroup}
 ### 后台任务与备份
 
 - **RSS 轮询**：按 `rssSleepMinutes`（分钟）周期刷新订阅；**BGM 元数据**按 `bgmRefreshHours`（小时，缺省 6）后台刷新评分/总集数/已播出集数/封面，可配合「自动更新总集数 / 强制更新总集数」开关。
-- **备份与恢复**：网页「设置 → 基本」可一键导出 `anigo.backup.zip`（含配置、订阅与封面）或导入恢复。
+- **备份与恢复**：网页「设置 → 日志与备份」可一键导出 `anigo.backup.zip`（含配置、订阅与封面）或导入恢复。
+- **日志**：默认存内存环形缓冲（`logsMax` 条，日志页可查）；「设置 → 日志与备份」可配置 **日志级别**（DEBUG/INFO/WARN/ERROR）与 **落盘文件**（相对配置目录路径，如 `logs/anigo.log`，留空不落盘），落盘后重启仍可回溯历史日志。
 
 > [!NOTE]
 > **在线播放（可选）**：首页订阅卡片点击播放图标，通过 `mpv-handler://` 协议拉起系统播放器（mpv 等）观看 115 云端文件。需安装并注册 [mpv-handler](https://github.com/akiirui/mpv-handler)；前端经本地 `/api/file` 代理转发 115 CDN 流，播放器只访问本地端点，不暴露云端地址。

@@ -29,8 +29,6 @@ func main() {
 	// 1. 底层适配器
 	st := store.NewJSONStore(dir)
 	cache := store.NewTTLCache()
-	logger := log.New(256)
-	logService := service.NewLogService(logger)
 
 	// 2. 业务服务（构造器注入）
 	cfgService, err := service.NewConfigService(st, cache)
@@ -38,6 +36,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "加载配置失败:", err)
 		os.Exit(1)
 	}
+	cfg := cfgService.Get()
+	logger := log.New(cfg.LogsMax)
+	logger.SetLevel(cfg.LogsLevel)
+	logService := service.NewLogService(logger)
+	logService.Reload(dir, cfg)
 	rssService := service.NewRssService(cfgService, logger)
 	metaService := service.NewMetadataService(cfgService, cache)
 	notifyService := service.NewNotifyService(cfgService, func(msg string) {

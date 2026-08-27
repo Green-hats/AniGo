@@ -1,6 +1,8 @@
 package service
 
 import (
+	"path/filepath"
+
 	"github.com/greenhats/anigo/internal/domain"
 	"github.com/greenhats/anigo/internal/log"
 )
@@ -20,3 +22,16 @@ func (s *LogService) List() []domain.Log { return s.logger.List() }
 
 // Clear 清空日志。
 func (s *LogService) Clear() { s.logger.Clear() }
+
+// Reload 按最新配置调整日志级别与落盘。
+// dir 为配置目录，logsFile 为相对路径（空表示不落盘）。
+func (s *LogService) Reload(dir string, cfg *domain.Config) {
+	s.logger.SetLevel(cfg.LogsLevel)
+	path := ""
+	if cfg.LogsFile != "" {
+		path = filepath.Join(dir, cfg.LogsFile)
+	}
+	if err := s.logger.SetFile(path); err != nil {
+		s.logger.Error("log", "日志落盘打开失败: "+err.Error())
+	}
+}

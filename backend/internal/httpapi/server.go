@@ -141,6 +141,7 @@ func (s *Server) handleSetConfig(c *gin.Context) {
 	}
 	s.rss.ReloadAI()
 	s.meta.Reload()
+	s.logs.Reload(s.cfg.Dir(), s.cfg.Get())
 	okMsg(c, "修改成功")
 }
 
@@ -217,6 +218,7 @@ func (s *Server) handleImportConfig(c *gin.Context) {
 		fail(c, err.Error())
 		return
 	}
+	s.logs.Reload(s.cfg.Dir(), s.cfg.Get())
 	okMsg(c, "导入成功")
 }
 
