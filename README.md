@@ -206,8 +206,8 @@ graph LR
 ## 致谢
 
 - [ani-rss](https://github.com/wushuo894/ani-rss) — 思路与契约格式来源
-- [mpv-handler](https://github.com/akiirui/mpv-handler) — 在线播放协议
-- [ChenyangGao/qrcode_cookie_115](https://gist.github.com/ChenyangGao/d26a592a0aeb13465511c885d5c7ad61) — 115 扫码脚本
+- [mpv-handler](https://github.com/akiirui/mpv-handler) — mpv 在线播放协议
+- [ChenyangGao/qrcode_cookie_115](https://gist.github.com/ChenyangGao/d26a592a0aeb13465511c885d5c7ad61) — 115 扫码登录获取 Cookie 脚本
 
 ---
 
