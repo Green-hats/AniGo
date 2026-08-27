@@ -37,15 +37,25 @@
 
 | 能力 | 说明 |
 | --- | --- |
-| **云端追番** | RSS 自动离线下载到 115 网盘，本地零存储 |
-| **AI 解析** | DeepSeek 等大模型批量解析标题，提取集数 / 分辨率 / 字幕组 / 选版信号，同步完成规则与简中字幕筛选 |
-| **智能选版** | 同集多版本自动择优（分辨率 > 压制源 > 编码 > 色深 > 字幕嵌入/语言），每集不重复下载 |
-| **四源聚合** | [animes.garden](https://animes.garden)（動漫花園 + 蜜柑 + 萌番组 + ANi 聚合）作番剧源 |
-| **在线播放** | 首页直接调用系统播放器（mpv 等）经本地代理播放 115 云端文件，无需下载 |
-| **元数据** | Bangumi 评分 / 季数 / 总集数、封面下载 |
-| **通知** | Telegram / Bark / ServerChan / WebHook / Shell / 系统日志 |
-| **单二进制** | 前端 React 构建产物嵌入后端，一个 `anigo` 搞定 |
-| **多设备** | 服务器部署，任意设备浏览器访问管理 |
+<table>
+  <thead>
+    <tr>
+      <th width="220">能力</th>
+      <th>说明</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><b>云端追番</b></td><td>RSS 自动离线下载到 115 网盘，本地零存储</td></tr>
+    <tr><td><b>AI 解析</b></td><td>DeepSeek 等大模型批量解析标题，提取集数 / 分辨率 / 字幕组 / 选版信号，同步完成规则与简中字幕筛选</td></tr>
+    <tr><td><b>智能选版</b></td><td>同集多版本自动择优（分辨率 > 压制源 > 编码 > 色深 > 字幕嵌入/语言），每集不重复下载</td></tr>
+    <tr><td><b>四源聚合</b></td><td><a href="https://animes.garden">animes.garden</a>（動漫花園 + 蜜柑 + 萌番组 + ANi 聚合）作番剧源</td></tr>
+    <tr><td><b>在线播放</b></td><td>首页直接调用系统播放器（mpv 等）经本地代理播放 115 云端文件，无需下载</td></tr>
+    <tr><td><b>元数据</b></td><td>Bangumi 评分 / 季数 / 总集数、封面下载</td></tr>
+    <tr><td><b>通知</b></td><td>Telegram / Bark / ServerChan / WebHook / Shell / 系统日志</td></tr>
+    <tr><td><b>单二进制</b></td><td>前端 React 构建产物嵌入后端，一个 <code>anigo</code> 搞定</td></tr>
+    <tr><td><b>多设备</b></td><td>服务器部署，任意设备浏览器访问管理</td></tr>
+  </tbody>
+</table>
 
 ## 快速开始
 
