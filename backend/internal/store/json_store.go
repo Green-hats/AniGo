@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/greenhats/anigo/internal/domain"
@@ -134,99 +136,18 @@ func (s *JSONStore) writeJSONLocked(path string, v interface{}) error {
 	return os.Rename(tmp, path)
 }
 
+// fillConfigDefaults 将 def 中"文件中缺失"的字段应用到 c。
+// 通过反射遍历 Config 的 json tag 与 present 对比，避免逐字段手写（新增字段自动获得默认值）。
 func fillConfigDefaults(c, def *domain.Config, present map[string]bool) {
-	if !present["mikanHost"] {
-		c.MikanHost = def.MikanHost
-	}
-	if !present["downloadToolType"] {
-		c.DownloadToolType = def.DownloadToolType
-	}
-	if !present["pan115Cookie"] {
-		c.Pan115Cookie = def.Pan115Cookie
-	}
-	if !present["downloadPathTemplate"] {
-		c.DownloadPathTemplate = def.DownloadPathTemplate
-	}
-	if !present["ovaDownloadPathTemplate"] {
-		c.OvaDownloadPathTemplate = def.OvaDownloadPathTemplate
-	}
-	if !present["rssSleepMinutes"] {
-		c.RssSleepMinutes = def.RssSleepMinutes
-	}
-	if !present["rename"] {
-		c.Rename = def.Rename
-	}
-	if !present["rss"] {
-		c.Rss = def.Rss
-	}
-	if !present["rssTimeout"] {
-		c.RssTimeout = def.RssTimeout
-	}
-	if !present["skip5"] {
-		c.Skip5 = def.Skip5
-	}
-	if !present["logsMax"] {
-		c.LogsMax = def.LogsMax
-	}
-	if !present["procrastinatingMasterOnly"] {
-		c.ProcrastinatingMasterOnly = def.ProcrastinatingMasterOnly
-	}
-	if !present["proxyPort"] {
-		c.ProxyPort = def.ProxyPort
-	}
-	if !present["login"] {
-		c.Login = def.Login
-	}
-	if !present["loginEffectiveHours"] {
-		c.LoginEffectiveHours = def.LoginEffectiveHours
-	}
-	if !present["multiLoginForbidden"] {
-		c.MultiLoginForbidden = def.MultiLoginForbidden
-	}
-	if !present["exclude"] {
-		c.Exclude = def.Exclude
-	}
-	if !present["omit"] {
-		c.Omit = def.Omit
-	}
-	if !present["customEpisodeGroupIndex"] {
-		c.CustomEpisodeGroupIndex = def.CustomEpisodeGroupIndex
-	}
-	if !present["customEpisodeStr"] {
-		c.CustomEpisodeStr = def.CustomEpisodeStr
-	}
-	if !present["procrastinatingDay"] {
-		c.ProcrastinatingDay = def.ProcrastinatingDay
-	}
-	if !present["downloadTimeout"] {
-		c.DownloadTimeout = def.DownloadTimeout
-	}
-	if !present["sortType"] {
-		c.SortType = def.SortType
-	}
-	if !present["limitLoginAttempts"] {
-		c.LimitLoginAttempts = def.LimitLoginAttempts
-	}
-	if !present["bgmApi"] {
-		c.BgmApi = def.BgmApi
-	}
-	if !present["aiEnabled"] {
-		c.AiEnabled = def.AiEnabled
-	}
-	if !present["aiProvider"] {
-		c.AiProvider = def.AiProvider
-	}
-	if !present["aiBaseURL"] {
-		c.AiBaseURL = def.AiBaseURL
-	}
-	if !present["aiModel"] {
-		c.AiModel = def.AiModel
-	}
-	if !present["aiPrompt"] {
-		c.AiPrompt = def.AiPrompt
-	}
-	if !present["notificationTemplate"] {
-		c.NotificationTemplate = def.NotificationTemplate
+	cv := reflect.ValueOf(c).Elem()
+	dv := reflect.ValueOf(def).Elem()
+	t := cv.Type()
+	for i := 0; i < t.NumField(); i++ {
+		key := jsonTagName(t.Field(i))
+		if key == "" || present[key] {
+			continue
+		}
+		cv.Field(i).Set(dv.Field(i))
 	}
 	// 列表始终序列化为 []（前端依赖 .length/.push）
 	if c.Exclude == nil {
@@ -238,6 +159,18 @@ func fillConfigDefaults(c, def *domain.Config, present map[string]bool) {
 	if c.ReverseProxyTrustIpList == nil {
 		c.ReverseProxyTrustIpList = []string{}
 	}
+}
+
+// jsonTagName 返回字段 json tag 的键名（去 omitempty 等选项，无 tag 返回空）。
+func jsonTagName(f reflect.StructField) string {
+	key := f.Tag.Get("json")
+	if key == "" {
+		return ""
+	}
+	if i := strings.IndexByte(key, ','); i >= 0 {
+		key = key[:i]
+	}
+	return key
 }
 
 func fillAniDefaults(a *domain.Ani) {

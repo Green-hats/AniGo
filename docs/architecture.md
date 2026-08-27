@@ -292,16 +292,17 @@ type TaskManager struct {
 }
 func (t *TaskManager) Start() {
     t.ctx, t.cancel = context.WithCancel(context.Background())
-    t.wg.Add(1)
-    go t.runRSSLoop()   // 每 RssSleepMinutes 分钟（runBgmLoop 未实现）
+    t.wg.Add(2)
+    go t.runRSSLoop()   // 每 RssSleepMinutes 分钟
+    go t.runBgmLoop()   // 每 bgmRefreshInterval（6h）刷新 Bangumi 元数据
 }
 func (t *TaskManager) Stop() { t.cancel(); t.wg.Wait() }
 ```
 
 - 每个循环内部用 `select { case <-ctx.Done(): return; case <-time.After(d): }`
 - 循环内每轮调用 service 时也透传 ctx，可被优雅中断
-- `DownloadService.DownloadAni` 内部串行下载，用 `ctx` 控制取消
-- ⚠️ 已知问题：`DownloadAni` 尚不感知 `ctx`，若下载进行中收到 SIGTERM，`Stop()` 会阻塞（未实现优雅中断）
+- `runBgmLoop` 每 6 小时调用 `MetadataService.RefreshAll` 刷新订阅的评分/总集数/已播出集数/封面（受 `UpdateTotalEpisodeNumber` / `ForceUpdateTotalEpisodeNumber` 配置控制）
+- `DownloadService.DownloadAni` / `SyncDownload` 透传 ctx 并在条目循环内检查 `ctx.Err()`，下载进行中收到 SIGTERM 时 `Stop()` 不会阻塞，可优雅中断
 
 ## 8. HTTP 层（Gin）
 

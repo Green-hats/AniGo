@@ -139,6 +139,63 @@ func (s *MetadataService) RssToAni(ctx context.Context, dto *domain.RssToAniDTO)
 	return ani, nil
 }
 
+// RefreshAll 后台定期刷新所有订阅的 Bangumi 元数据（评分/总集数/已播出集数/封面）。
+// 逐订阅独立请求，单个失败不中断其余；ctx 取消时提前结束（优雅停机）。
+func (s *MetadataService) RefreshAll(ctx context.Context, list []*domain.Ani) {
+	cfg := s.cfg.Get()
+	changed := false
+	for _, ani := range list {
+		if ctx.Err() != nil {
+			return
+		}
+		if ani == nil || !ani.Enable || ani.BgmUrl == "" {
+			continue
+		}
+		subjectID := bgm.GetSubjectIdByURL(ani.BgmUrl)
+		if subjectID == "" {
+			continue
+		}
+		info, err := s.bgm.GetInfo(ctx, subjectID)
+		if err != nil {
+			continue
+		}
+		// 封面仅在路径变化时重下（避免反复写盘）
+		image := ""
+		if cfg.BgmImage != "" {
+			image = bgm.ImageField(&info.Images, cfg.BgmImage)
+		} else {
+			image = info.Images.Large
+		}
+		if image != "" && image != ani.Image {
+			ani.Image = image
+			if cover := s.SaveCover(image); cover != "" {
+				ani.Cover = cover
+			}
+		}
+		if info.Rating.Score != 0 && info.Rating.Score != ani.Score {
+			ani.Score = info.Rating.Score
+			changed = true
+		}
+		total := s.bgm.GetEps(ctx, info)
+		if cfg.UpdateTotalEpisodeNumber && total > 0 && total != ani.TotalEpisodeNumber {
+			ani.TotalEpisodeNumber = total
+			changed = true
+		}
+		if cfg.ForceUpdateTotalEpisodeNumber && total > 0 {
+			ani.TotalEpisodeNumber = total
+			changed = true
+		}
+		aired := s.bgm.GetAiredEps(ctx, info)
+		if aired > 0 && aired != ani.BgmAiredEps {
+			ani.BgmAiredEps = aired
+			changed = true
+		}
+	}
+	if changed {
+		_ = s.cfg.SaveAniList(s.cfg.AniList())
+	}
+}
+
 // ToAni 用 BGM 信息填充订阅（镜像 BgmUtil.toAni）。
 func (s *MetadataService) ToAni(ctx context.Context, info *domain.BgmInfo, ani *domain.Ani) *domain.Ani {
 	if info == nil || ani == nil {

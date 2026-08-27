@@ -53,7 +53,7 @@ func (s *Server) handlePlayList(c *gin.Context) {
 
 // handleRefreshAll 触发一轮全部订阅刷新。
 func (s *Server) handleRefreshAll(c *gin.Context) {
-	go s.download.SyncDownload(s.cfg.AniList())
+	go s.download.SyncDownload(c.Request.Context(), s.cfg.AniList())
 	okMsg(c, "已开始刷新RSS")
 }
 
@@ -68,7 +68,7 @@ func (s *Server) handleRefreshAni(c *gin.Context) {
 		fail(c, "订阅不存在")
 		return
 	}
-	go s.download.DownloadAni(ani)
+	go s.download.DownloadAni(c.Request.Context(), ani)
 	okMsg(c, "已开始刷新RSS")
 }
 

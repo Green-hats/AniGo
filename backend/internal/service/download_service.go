@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,12 +29,6 @@ type DownloadService struct {
 	playCache map[string]*playCacheEntry // 播放列表短缓存（key=订阅id）
 }
 
-// playCacheEntry 是播放列表的短缓存条目。
-type playCacheEntry struct {
-	items   []domain.PlayItem
-	expire  time.Time
-}
-
 // CloudProvider 是下载服务对网盘注册表的依赖接口，
 // 由 cloud.Registry 实现（避免 service 依赖具体适配器）。
 type CloudProvider interface {
@@ -44,7 +37,7 @@ type CloudProvider interface {
 }
 
 var (
-	regSeasonEp = regexp.MustCompile(`[Ss](\d+)[Ee](\d+(\.5)?)`)
+	regSeasonEp   = regexp.MustCompile(`[Ss](\d+)[Ee](\d+(\.5)?)`)
 	downloadMutex = make(chan struct{}, 1)
 )
 
@@ -88,90 +81,10 @@ func (s *DownloadService) DownloadLoginStatus() domain.LoginStatus {
 	return s.Driver().GetLoginStatus()
 }
 
-// PlayList 返回订阅在 115 云端目录下所有可播放文件（含提取的集号与 pickcode）。
-// 递归遍历子目录：115 离线会把每个文件包成一个同名文件夹（fc=0 视为目录），
-// 真正可播放的文件在文件夹内部（fc=1）。
-// 不在此处取 CDN URL：URL 会过期且绑定 UA，改为播放时经本地代理转发获取。
-// 结果做 30 秒短缓存，避免短时间内重复打开播放弹窗时反复遍历 115。
-func (s *DownloadService) PlayList(ctx context.Context, ani *domain.Ani) ([]domain.PlayItem, error) {
-	s.playMu.Lock()
-	if e, ok := s.playCache[ani.ID]; ok && time.Now().Before(e.expire) {
-		items := e.items
-		s.playMu.Unlock()
-		return items, nil
-	}
-	s.playMu.Unlock()
-
-	cfg := s.cfg.Get()
-	if !s.Login(true) {
-		return nil, fmt.Errorf("下载客户端登录失败: %s", s.Driver().GetLoginStatus().Message)
-	}
-	savePath := GetDownloadPath(cfg, ani, s.pathResolve())
-	var items []domain.PlayItem
-	var walk func(path string, depth int) error
-	walk = func(path string, depth int) error {
-		if depth > 6 {
-			return nil
-		}
-		files, err := s.Driver().ListDir(ctx, cfg, path)
-		if err != nil {
-			return nil
-		}
-		for _, f := range files {
-			// 115 的 /files 接口：fc=0 → 目录（含同名文件包文件夹），fc=1 → 文件。
-			// 目录一律继续下钻；文件仅视频扩展名作为播放项。
-			if f.IsDir {
-				if err := walk(path+"/"+f.Name, depth+1); err != nil {
-					return err
-				}
-				continue
-			}
-			if !isVideoFile(f.Name) {
-				continue
-			}
-			items = append(items, domain.PlayItem{
-				Episode:  extractEpisode(f.Name),
-				Filename: f.Name,
-				PickCode: f.PickCode,
-			})
-		}
-		return nil
-	}
-	if err := walk(savePath, 0); err != nil {
-		return nil, err
-	}
-
-	s.playMu.Lock()
-	s.playCache[ani.ID] = &playCacheEntry{items: items, expire: time.Now().Add(30 * time.Second)}
-	s.playMu.Unlock()
-	return items, nil
-}
-
-// PlayStreamURL 通过 pickcode 取 115 CDN 直链（播放代理转发用）。
-func (s *DownloadService) PlayStreamURL(ctx context.Context, pickcode string) (string, error) {
-	cfg := s.cfg.Get()
-	return s.Driver().FileURLByPickCode(ctx, cfg, pickcode)
-}
-
-// 常见视频文件扩展名（115 转存后的种子原始文件名通常是这些）。
-var videoExts = map[string]bool{
-	"mkv": true, "mp4": true, "avi": true, "ts": true, "flv": true,
-	"webm": true, "wmv": true, "mov": true, "m4v": true, "m2ts": true, "rmvb": true,
-}
-
-// isVideoFile 判断文件名是否为可播放的视频文件（按扩展名）。
-func isVideoFile(name string) bool {
-	idx := strings.LastIndex(name, ".")
-	if idx < 0 {
-		return false
-	}
-	return videoExts[strings.ToLower(name[idx+1:])]
-}
-
 // SyncDownload 运行一轮下载（遍历所有启用的订阅）。
-func (s *DownloadService) SyncDownload(list []*domain.Ani) {
+func (s *DownloadService) SyncDownload(ctx context.Context, list []*domain.Ani) {
 	cfg := s.cfg.Get()
-	if ok, _ := s.Driver().Login(context.Background(), true, cfg); !ok {
+	if ok, _ := s.Driver().Login(ctx, true, cfg); !ok {
 		st := s.Driver().GetLoginStatus()
 		msg := st.Message
 		if msg == "" {
@@ -181,22 +94,30 @@ func (s *DownloadService) SyncDownload(list []*domain.Ani) {
 		return
 	}
 	for _, ani := range list {
+		if ctx.Err() != nil {
+			s.logf("INFO", "download", "下载同步被取消, 提前结束本轮")
+			return
+		}
 		if ani == nil || !ani.Enable {
 			continue
 		}
-		s.downloadAni(ani, false)
-		time.Sleep(500 * time.Millisecond)
+		s.downloadAni(ctx, ani, false)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(500 * time.Millisecond):
+		}
 	}
 }
 
 // DownloadAni 是每个订阅的下载主流程（公共入口，带登录检查）。
-func (s *DownloadService) DownloadAni(ani *domain.Ani) {
-	s.downloadAni(ani, true)
+func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) {
+	s.downloadAni(ctx, ani, true)
 }
 
 // downloadAni 是 DownloadAni 的内部实现。
 // checkLogin 为 true 时先验证网盘登录，Cookie 失效直接返回，避免盲目提交失败任务。
-func (s *DownloadService) downloadAni(ani *domain.Ani, checkLogin bool) {
+func (s *DownloadService) downloadAni(ctx context.Context, ani *domain.Ani, checkLogin bool) {
 	downloadMutex <- struct{}{}
 	defer func() { <-downloadMutex }()
 	defer func() {
@@ -207,7 +128,7 @@ func (s *DownloadService) downloadAni(ani *domain.Ani, checkLogin bool) {
 
 	cfg := s.cfg.Get()
 	if checkLogin {
-		if ok, _ := s.Driver().Login(context.Background(), true, cfg); !ok {
+		if ok, _ := s.Driver().Login(ctx, true, cfg); !ok {
 			st := s.Driver().GetLoginStatus()
 			msg := st.Message
 			if msg == "" {
@@ -229,6 +150,10 @@ func (s *DownloadService) downloadAni(ani *domain.Ani, checkLogin bool) {
 	currentDownloadCount := 0
 
 	for _, item := range items {
+		if ctx.Err() != nil {
+			s.logf("INFO", "download", "%s 下载被取消, 提前终止", ani.Title)
+			return
+		}
 		reName := item.ReName
 		hash := strings.ToLower(item.InfoHash)
 		episode := item.Episode
@@ -295,7 +220,7 @@ func (s *DownloadService) downloadAni(ani *domain.Ani, checkLogin bool) {
 		}
 
 		// 提交离线下载（异步，115 自行转存）
-		if err := driver.AddOfflineTask(context.Background(), cfg, item.Torrent, savePath+"/"+reName); err != nil {
+		if err := driver.AddOfflineTask(ctx, cfg, item.Torrent, savePath+"/"+reName); err != nil {
 			s.logf("ERROR", "download", "%s 添加下载失败: %v", reName, err)
 			continue
 		}
@@ -444,69 +369,4 @@ func containsFloat(list []float64, v float64) bool {
 		}
 	}
 	return false
-}
-
-// 播放列表的集号提取正则（针对 115 云端种子原始文件名）。
-var (
-	regPlayEp   = regexp.MustCompile(`(?i)(?:^|[^0-9])(?:e|ep)[\s._-]*(\d+)`) // S01E01 / EP03 / E01
-	regPlayCn   = regexp.MustCompile(`第\s*(\d+)`)                            // 第01话
-	regPlayDash = regexp.MustCompile(`[\s._\-[(](\d{2,3})[\s.\])]`)          // - 04 / [04] / _01
-)
-
-// extractEpisode 从 115 云端文件名（种子原始名）中尽力提取集号。
-// 无法识别返回 0。
-func extractEpisode(filename string) int {
-	for _, re := range []*regexp.Regexp{regPlayEp, regPlayCn, regPlayDash} {
-		if m := re.FindStringSubmatch(filename); len(m) > 1 {
-			if n, err := strconv.Atoi(m[1]); err == nil {
-				return n
-			}
-		}
-	}
-	return 0
-}
-
-
-// NoopDriver 是空驱动占位。
-type NoopDriver struct{}
-
-// Name 返回空驱动名。
-func (n *NoopDriver) Name() string { return "none" }
-
-// Login 返回未配置。
-func (n *NoopDriver) Login(ctx context.Context, test bool, cfg *domain.Config) (bool, error) {
-	return false, nil
-}
-
-// AddOfflineTask 返回未配置错误。
-func (n *NoopDriver) AddOfflineTask(ctx context.Context, cfg *domain.Config, magnet, destPath string) error {
-	return fmt.Errorf("未配置网盘驱动")
-}
-
-// FileExists 返回 false。
-func (n *NoopDriver) FileExists(ctx context.Context, cfg *domain.Config, path string) (bool, error) {
-	return false, nil
-}
-
-// FileURL 返回空串。
-func (n *NoopDriver) FileURL(ctx context.Context, cfg *domain.Config, path string) (string, error) {
-	return "", nil
-}
-
-// FileURLByPickCode 返回空串。
-func (n *NoopDriver) FileURLByPickCode(ctx context.Context, cfg *domain.Config, pickcode string) (string, error) {
-	return "", nil
-}
-
-// ListDir 返回空。
-func (n *NoopDriver) ListDir(ctx context.Context, cfg *domain.Config, path string) ([]domain.CloudFile, error) {
-	return nil, nil
-}
-
-// DeleteDir 返回 nil。
-func (n *NoopDriver) DeleteDir(ctx context.Context, cfg *domain.Config, path string) error { return nil }
-
-// GetLoginStatus 返回未配置状态。
-func (n *NoopDriver) GetLoginStatus() domain.LoginStatus {
-	return domain.LoginStatus{Configured: false, Message: "未配置网盘"}
 }

@@ -27,7 +27,8 @@ func newTestTaskManager(t *testing.T) *TaskManager {
 	cfg.Get().Rss = false
 	rss := service.NewRssService(cfg, nil)
 	download := service.NewDownloadService(cfg, rss, noopCloud{}, store.NewTTLCache(), nil, nil, nil)
-	return NewTaskManager(cfg, download, nil)
+	meta := service.NewMetadataService(cfg, store.NewTTLCache())
+	return NewTaskManager(cfg, download, meta, nil)
 }
 
 func TestStartStopLifecycle(t *testing.T) {
@@ -73,5 +74,17 @@ func TestStartStopCompletesWithinTimeout(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("Stop 超时，未能优雅退出")
+	}
+}
+
+func TestBgmLoopStartsAndStops(t *testing.T) {
+	// runBgmLoop 应随 Start 启动、随 Stop 优雅退出
+	tm := newTestTaskManager(t)
+	tm.Start()
+	// 等待两个循环 goroutine 都就绪
+	time.Sleep(50 * time.Millisecond)
+	tm.Stop()
+	if tm.running {
+		t.Error("Stop 后 running 应为 false")
 	}
 }

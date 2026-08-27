@@ -16,8 +16,7 @@
     "antd": "^6.6.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.2",
-    "zustand": "^5.0.15"
+    "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

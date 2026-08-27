@@ -47,11 +47,11 @@ func main() {
 	cloudReg := cloud.NewRegistry()
 	downloadService := service.NewDownloadService(cfgService, rssService, cloudReg, cache, metaService, notifyService, logger)
 	// 订阅添加成功后立即异步触发一轮下载
-	aniService.SetOnAdded(func(ani *domain.Ani) { downloadService.DownloadAni(ani) })
+	aniService.SetOnAdded(func(ani *domain.Ani) { downloadService.DownloadAni(context.Background(), ani) })
 	statusService := service.NewStatusService(cfgService, rssService, downloadService, cache)
 
 	// 3. 后台任务
-	taskMgr := task.NewTaskManager(cfgService, downloadService, logger)
+	taskMgr := task.NewTaskManager(cfgService, downloadService, metaService, logger)
 	taskMgr.Start()
 
 	// 4. HTTP 层
