@@ -102,6 +102,24 @@ make e2e                       # 端到端集成测试（需真实外部服务�
 
 覆盖范围：后端单元测试（store/util/domain/rename/rss/service/provider）、前端测试（API client/App 路由/SideMenu 导航）、E2E（基础 API/配置/AI/元数据/RSS/订阅/115 登录/通知/导出导入）。
 
+## 使用发布版二进制
+
+从 [Releases](https://github.com/Green-hats/AniGo/releases) 下载对应平台的单文件二进制（前端已内嵌，无需 Go/Node 环境）：
+
+```bash
+chmod +x anigo-linux-amd64
+./anigo-linux-amd64                  # 默认端口 7789，配置目录 ./config
+PORT=9000 ./anigo-linux-amd64        # 自定义端口
+CONFIG=/data/anigo ./anigo-linux-amd64  # 自定义配置目录
+```
+
+Windows 直接运行 `anigo-windows-amd64.exe`（参数相同）。首次启动自动生成配置，浏览器打开 `http://服务器:7789`，默认账号 `admin` / `admin`。
+
+产生文件（均在配置目录）：`config.v2.json`（主配置）、`ani.v2.json`（订阅列表）、`files/`（封面缓存）；日志在内存中，视频全部离线下载到 115 云盘，本地零存储。
+
+> [!NOTE]
+> 发布版二进制内嵌的默认密钥为空，需在网页「设置」里自行填入 115 Cookie 与 AI Key。
+
 ## 配置指南
 
 ### 下载路径模板
