@@ -21,6 +21,18 @@
 
 ---
 
+## 界面预览
+
+<p align="center">
+  <img src="docs/screenshots/home.png" width="500" alt="首页 · 我的订阅">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/garden.png" width="290" alt="番剧源">
+  <img src="docs/screenshots/settings.png" width="290" alt="设置">
+  <img src="docs/screenshots/logs.png" width="290" alt="日志">
+</p>
+
 ## 核心特性
 
 | 能力 | 说明 |
@@ -34,20 +46,6 @@
 | 🔔 **通知** | Telegram / Bark / ServerChan / WebHook / Shell / 系统日志 |
 | 📦 **单二进制** | 前端 React 构建产物嵌入后端，一个 `anigo` 搞定 |
 | 📱 **多设备** | 服务器部署，任意设备浏览器访问管理 |
-
-## 界面预览
-
-<p align="center">
-  <img src="docs/screenshots/home.png" width="760" alt="首页 · 我的订阅">
-</p>
-
-<p align="center">
-  <em>首页 · 我的订阅</em>
-</p>
-
-| 番剧源 | 设置 | 日志 |
-| --- | --- | --- |
-| <img src="docs/screenshots/garden.png" width="240" alt="番剧源"> | <img src="docs/screenshots/settings.png" width="240" alt="设置"> | <img src="docs/screenshots/logs.png" width="240" alt="日志"> |
 
 ## 快速开始
 
