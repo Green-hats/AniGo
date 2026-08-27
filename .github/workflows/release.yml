@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}/${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: windows
+            arch: amd64
+          - os: windows
+            arch: arm64
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: backend/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Embed frontend into backend
+        working-directory: backend
+        run: |
+          rm -rf internal/httpapi/static
+          mkdir -p internal/httpapi/static
+          cp -r ../frontend/dist/. internal/httpapi/static/
+
+      - name: Generate secrets stub
+        run: |
+          cat > backend/internal/domain/secrets.go <<'EOF'
+          package domain
+
+          func defaultAiApiKey() string    { return "" }
+          func defaultPan115Cookie() string { return "" }
+          EOF
+
+      - name: Cross-compile
+        env:
+          CGO_ENABLED: '0'
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          EXT=""
+          if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w" \
+            -o ../dist/anigo-${{ matrix.os }}-${{ matrix.arch }}$EXT \
+            ./cmd/anigo
+        working-directory: backend
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anigo-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/anigo-*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub release
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
