@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" alt="Go">
-  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white" alt="React">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white" alt="React">
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/license-GPLv3-blue" alt="License">
   <img src="https://img.shields.io/badge/status-stable-brightgreen" alt="Status">
@@ -48,7 +48,7 @@
     <tr><td align="center"><b>智能选版</b></td><td>同集多版本自动择优（分辨率 > 压制源 > 编码 > 色深 > 字幕嵌入/语言），每集不重复下载</td></tr>
     <tr><td align="center"><b>四源聚合</b></td><td><a href="https://animes.garden">animes.garden</a>（動漫花園 + 蜜柑 + 萌番组 + ANi 聚合）作番剧源</td></tr>
     <tr><td align="center"><b>在线播放</b></td><td>首页直接调用系统播放器（mpv 等）经本地代理播放 115 云端文件，无需下载</td></tr>
-    <tr><td align="center"><b>元数据</b></td><td>Bangumi 评分 / 季数 / 总集数、封面下载</td></tr>
+    <tr><td align="center"><b>元数据</b></td><td>Bangumi 评分 / 季数 / 总集数、封面下载，后台定时刷新（周期可配）</td></tr>
     <tr><td align="center"><b>通知</b></td><td>Telegram / Bark / ServerChan / WebHook / Shell / 系统日志</td></tr>
     <tr><td align="center"><b>单二进制</b></td><td>前端 React 构建产物嵌入后端，一个 <code>anigo</code> 搞定</td></tr>
   </tbody>
@@ -103,7 +103,7 @@ cd frontend && npm audit       # 前端：依赖漏洞扫描
 make e2e                       # 端到端集成测试（需真实外部服务：AI/115/BGM/animes.garden）
 ```
 
-覆盖范围：后端单元测试（store/util/domain/rename/rss/service/provider）、前端测试（API client/App 路由/SideMenu 导航）、E2E（基础 API/配置/AI/元数据/RSS/订阅/115 登录/通知/导出导入）。
+覆盖范围：后端单元测试（store/util/domain/rename/rss/scoring/service/httpapi/provider）、前端测试（API client/App 路由/SideMenu 导航）、E2E（基础 API/配置/AI/元数据/RSS/订阅/115 登录/通知/导出导入）。
 
 ## 使用发布版二进制
 
@@ -143,6 +143,11 @@ ${bgmId} ${jpTitle} ${subgroup}
 - **模板**：`${text} ${title} ${season} ${episode} ${emoji} ${action}` 等
 - **重试次数、排序、备注**
 
+### 后台任务与备份
+
+- **RSS 轮询**：按 `rssSleepMinutes`（分钟）周期刷新订阅；**BGM 元数据**按 `bgmRefreshHours`（小时，缺省 6）后台刷新评分/总集数/已播出集数/封面，可配合「自动更新总集数 / 强制更新总集数」开关。
+- **备份与恢复**：网页「设置 → 基本」可一键导出 `anigo.backup.zip`（含配置、订阅与封面）或导入恢复。
+
 > [!NOTE]
 > **在线播放（可选）**：首页订阅卡片点击播放图标，通过 `mpv-handler://` 协议拉起系统播放器（mpv 等）观看 115 云端文件。需安装并注册 [mpv-handler](https://github.com/akiirui/mpv-handler)；前端经本地 `/api/file` 代理转发 115 CDN 流，播放器只访问本地端点，不暴露云端地址。
 
@@ -161,9 +166,9 @@ anigo/
 │       ├── service/          # 业务服务（订阅/下载/通知/元数据/状态）
 │       ├── provider/         # 适配器：bgm/garden/ai/notifier
 │       ├── cloud/            # 网盘驱动（driver_115）
-│       ├── rss/ rename/      # 纯函数：RSS 解析/剧集提取/重命名
+│       ├── rss/ rename/ scoring/ # 纯函数：RSS 解析/剧集提取/重命名/选版打分
 │       ├── httpapi/          # Gin HTTP 层 + 嵌入前端
-│       └── task/             # 后台任务循环（RSS 轮询）
+│       └── task/             # 后台任务循环（RSS 轮询 + BGM 元数据刷新）
 ├── frontend/                 # 前端 React + TS + Ant Design
 │   ├── src/pages/            # 首页/番剧源/设置/日志页面
 │   └── src/**/*.test.tsx     # vitest 组件与 API 测试
