@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" alt="Go">
   <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white" alt="React">
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
+  <img src="https://img.shields.io/badge/license-GPLv3-blue" alt="License">
   <img src="https://img.shields.io/badge/status-stable-brightgreen" alt="Status">
   <img src="https://github.com/Green-hats/AniGo/actions/workflows/ci.yml/badge.svg" alt="CI">
 </p>
@@ -219,6 +219,10 @@ make e2e                       # 端到端集成测试（需真实外部服务�
 ## 📄 免责声明
 
 本工具为中立性技术辅助工具，请遵守当地法律法规，勿用于盗版传播。
+
+## 📜 License
+
+[GNU General Public License v3.0](LICENSE)（GPL-3.0）。
 
 ## 🤝 致谢
 
