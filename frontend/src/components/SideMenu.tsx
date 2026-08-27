@@ -15,22 +15,24 @@ export default function SideMenu() {
   const selected = '/' + (loc.pathname.split('/')[1] || 'home')
 
   return (
-    <Sider theme="dark" width={200}>
+    <Sider width={200} style={{ background: '#fff', borderRight: '1px solid #f0f0f0' }}>
       <div
         style={{
-          color: '#fff',
+          color: '#1f1f1f',
           fontSize: 18,
           fontWeight: 600,
           textAlign: 'center',
-          padding: '16px 0',
+          padding: '18px 0',
+          borderBottom: '1px solid #f0f0f0',
         }}
       >
         AniGo
       </div>
       <Menu
-        theme="dark"
+        theme="light"
         mode="inline"
         selectedKeys={[selected]}
+        style={{ background: '#fff', borderInlineEnd: 'none' }}
         items={[
           { key: '/home', icon: <HomeOutlined />, label: '我的订阅' },
           { key: '/garden', icon: <RocketOutlined />, label: '番剧源' },
