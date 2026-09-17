@@ -32,12 +32,11 @@ func New(cfg base.ConfigProvider, cache base.Cache) *BGM {
 
 // RefreshTokenFromConfig 根据配置重建鉴权头（配置变更后调用）。
 func (b *BGM) RefreshTokenFromConfig() {
+	headers := map[string]string{"Accept": "application/json"}
 	if cfg := b.Cfg.Get(); cfg != nil && cfg.BgmToken != "" {
-		b.Header["Authorization"] = "Bearer " + cfg.BgmToken
-	} else {
-		delete(b.Header, "Authorization")
+		headers["Authorization"] = "Bearer " + cfg.BgmToken
 	}
-	b.Header["Accept"] = "application/json"
+	b.SetHeaders(headers)
 }
 
 var subjectIdRe = regexp.MustCompile(`/subject/(\d+)`)
@@ -135,8 +134,8 @@ func parseSubject(m map[string]interface{}) *domain.BgmInfo {
 		URL:           "https://bgm.tv/subject/" + strVal(m["id"]),
 		Name:          strVal(m["name"]),
 		NameCn:        strVal(m["name_cn"]),
-		Eps:           intVal(m["eps"]),             // 已播出集数
-		TotalEpisodes: intVal(m["total_episodes"]),  // 总集数
+		Eps:           intVal(m["eps"]),            // 已播出集数
+		TotalEpisodes: intVal(m["total_episodes"]), // 总集数
 		Platform:      strVal(m["platform"]),
 	}
 	if p := strVal(m["type"]); p != "" && info.Platform == "" {

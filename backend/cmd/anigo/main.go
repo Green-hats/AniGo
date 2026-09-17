@@ -50,7 +50,11 @@ func main() {
 	cloudReg := cloud.NewRegistry()
 	downloadService := service.NewDownloadService(cfgService, rssService, cloudReg, cache, metaService, notifyService, logger)
 	// 订阅添加成功后立即异步触发一轮下载
-	aniService.SetOnAdded(func(ani *domain.Ani) { downloadService.DownloadAni(context.Background(), ani) })
+	aniService.SetOnAdded(func(ani *domain.Ani) {
+		if err := downloadService.EnqueueRefresh(ani.ID); err != nil {
+			logger.Error("download", err.Error())
+		}
+	})
 	statusService := service.NewStatusService(cfgService, rssService, downloadService, cache)
 
 	// 3. 后台任务

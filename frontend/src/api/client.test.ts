@@ -76,7 +76,7 @@ describe('api client', () => {
   })
 
   it('导入配置使用 FormData 而非 JSON', async () => {
-    mockFetch.mockResolvedValue(new Response(null, { status: 200 }))
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ code: 200, data: null }), { status: 200 }))
     const file = new File(['{}'], 'config.v2.json', { type: 'application/json' })
     await api.importConfig(file)
 
@@ -110,4 +110,29 @@ describe('api client', () => {
       vi.useRealTimers()
     }
   })
+  it('HTTP 401 即使没有 JSON 也清除登录态', async () => {
+    localStorage.setItem('anigo_token', 'expired')
+    mockFetch.mockResolvedValue(new Response('Unauthorized', { status: 401 }))
+    await expect(api.ping()).rejects.toThrow('未登录')
+    expect(localStorage.getItem('anigo_token')).toBeNull()
+  })
+
+  it('会话失效时不能把错误响应下载为 ZIP', async () => {
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ code: 401, message: '登录已过期' }), { status: 200 }))
+    await expect(api.exportConfig()).rejects.toThrow('登录已过期')
+  })
+
+  it('代理返回 HTML 错误时显示 HTTP 状态', async () => {
+    mockFetch.mockResolvedValue(new Response('<html>Bad gateway</html>', { status: 502 }))
+    await expect(api.listAni()).rejects.toThrow('HTTP 502')
+  })
+
+  it('返回备份 Blob 并正确编码字幕组查询参数', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('zip', { headers: { 'Content-Type': 'application/zip' } }))
+    expect(await (await api.exportConfig()).text()).toBe('zip')
+    mockFetch.mockResolvedValueOnce(jsonResp({ code: 200, data: [] }))
+    await api.gardenGroup('a&b')
+    expect(mockFetch.mock.calls[1][0]).toBe('/api/gardenGroup?subject=a%26b')
+  })
+
 })

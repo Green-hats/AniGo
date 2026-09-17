@@ -24,7 +24,9 @@ func newTestTaskManager(t *testing.T) *TaskManager {
 		t.Fatalf("NewConfigService: %v", err)
 	}
 	// 关闭 RSS 轮询，避免测试期间触发真实下载同步
-	cfg.Get().Rss = false
+	if err := cfg.SetConfigRaw([]byte(`{"rss":false}`)); err != nil {
+		t.Fatal(err)
+	}
 	rss := service.NewRssService(cfg, nil)
 	download := service.NewDownloadService(cfg, rss, noopCloud{}, store.NewTTLCache(), nil, nil, nil)
 	meta := service.NewMetadataService(cfg, store.NewTTLCache())
@@ -63,7 +65,9 @@ func TestStopBeforeStart(t *testing.T) {
 func TestStartStopCompletesWithinTimeout(t *testing.T) {
 	// 即使 Rss=true，Stop 也应通过 context 取消快速返回（不会等完整个 sleep interval）
 	tm := newTestTaskManager(t)
-	tm.cfg.Get().Rss = false
+	if err := tm.cfg.SetConfigRaw([]byte(`{"rss":false}`)); err != nil {
+		t.Fatal(err)
+	}
 	tm.Start()
 	done := make(chan struct{})
 	go func() {

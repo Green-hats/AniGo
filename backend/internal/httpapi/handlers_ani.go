@@ -43,7 +43,10 @@ func (s *Server) handleDeleteAni(c *gin.Context) {
 	if !readJSONOrFail(c, &ids) {
 		return
 	}
-	s.ani.DeleteAni(ids)
+	if err := s.ani.DeleteAni(ids); err != nil {
+		fail(c, err.Error())
+		return
+	}
 	okMsg(c, "删除订阅成功")
 }
 
@@ -53,7 +56,10 @@ func (s *Server) handleBatchEnable(c *gin.Context) {
 		return
 	}
 	value, _ := strconv.ParseBool(c.Query("value"))
-	s.ani.BatchEnable(ids, value)
+	if err := s.ani.BatchEnable(ids, value); err != nil {
+		fail(c, err.Error())
+		return
+	}
 	okMsg(c, "修改完成")
 }
 
@@ -62,7 +68,12 @@ func (s *Server) handlePreviewAni(c *gin.Context) {
 	if !readJSONOrFail(c, &body) {
 		return
 	}
-	ok(c, s.ani.PreviewAni(&body))
+	preview, err := s.ani.PreviewAni(c.Request.Context(), &body)
+	if err != nil {
+		fail(c, err.Error())
+		return
+	}
+	ok(c, preview)
 }
 
 func (s *Server) handleDownloadPath(c *gin.Context) {
@@ -70,7 +81,7 @@ func (s *Server) handleDownloadPath(c *gin.Context) {
 	if !readJSONOrFail(c, &body) {
 		return
 	}
-	ok(c, s.ani.DownloadPathPreview(&body))
+	ok(c, s.ani.DownloadPathPreview(c.Request.Context(), &body))
 }
 
 // readJSONOrFail 解码请求体，失败时写 500 错误并返回 false。

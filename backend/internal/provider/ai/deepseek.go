@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 
@@ -130,11 +131,11 @@ func (d *DeepSeek) parseSystemPrompt(ani *domain.Ani) string {
 		"排除规则（标题不得命中，可为空）：" + excludeRules + "\n" +
 		subtitleRule + "\n\n" +
 		"判定方法：标题需同时满足匹配规则、不命中排除规则" + func() string {
-			if d.cfg != nil && d.cfg.AiSubtitleSC {
-				return "、且包含简体中文字幕"
-			}
-			return ""
-		}() + "；若不符合任一要求或无法判断集数，则 episode 返回 0（表示丢弃）。\n\n" +
+		if d.cfg != nil && d.cfg.AiSubtitleSC {
+			return "、且包含简体中文字幕"
+		}
+		return ""
+	}() + "；若不符合任一要求或无法判断集数，则 episode 返回 0（表示丢弃）。\n\n" +
 		rules + "\n\n" +
 		"只输出 JSON，不要任何其他文字。格式如下（数组，顺序与输入一致）：\n" +
 		`[{"rawTitle":"原样返回标题","episode":3,"resolution":"1080P","subgroup":"ANi","title":"间谍过家家","isSpecial":false,"subtitleEmbed":"内嵌","videoCodec":"HEVC","source":"WebRip","colorDepth":"10bit","subtitleLang":"简繁日"}]`
@@ -157,6 +158,9 @@ func (d *DeepSeek) Parse(ctx context.Context, ani *domain.Ani, titles []string) 
 	if err := json.Unmarshal([]byte(raw), &out); err != nil {
 		return nil, fmt.Errorf("AI 返回 JSON 解析失败: %w", err)
 	}
+	if len(out) != len(titles) {
+		return nil, fmt.Errorf("AI 结果数量不匹配: %d != %d", len(out), len(titles))
+	}
 	// 补全 rawTitle（模型可能省略），确保与输入对齐
 	result := make([]domain.ParsedTitle, len(titles))
 	for i := range result {
@@ -165,6 +169,12 @@ func (d *DeepSeek) Parse(ctx context.Context, ani *domain.Ani, titles []string) 
 	for i, pt := range out {
 		if i >= len(result) {
 			break
+		}
+		if pt.RawTitle != "" && pt.RawTitle != titles[i] {
+			return nil, fmt.Errorf("AI 返回标题顺序不匹配")
+		}
+		if math.IsNaN(pt.Episode) || math.IsInf(pt.Episode, 0) || pt.Episode < 0 {
+			return nil, fmt.Errorf("AI 返回无效集号")
 		}
 		pt.RawTitle = titles[i]
 		result[i] = pt

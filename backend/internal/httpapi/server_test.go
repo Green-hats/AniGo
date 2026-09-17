@@ -24,17 +24,22 @@ type noopCloud struct{}
 func (noopCloud) Get(cfg *domain.Config) domain.CloudDriver { return &service.NoopDriver{} }
 
 // newTestServer 组装一个完整但隔离外部依赖的 Server。
-func newTestServer(t *testing.T) *Server {
+func newTestServer(t *testing.T) *Server { return newTestServerWithPassword(t, "") }
+
+func newTestServerWithPassword(t *testing.T, password string) *Server {
 	t.Helper()
 	st := store.NewJSONStore(t.TempDir())
+	initial := domain.DefaultConfig()
+	initial.AiApiKey, initial.Login.Password, initial.Rss = "", password, false
+	if err := st.SaveConfig(initial); err != nil {
+		t.Fatal(err)
+	}
 	cfg, err := service.NewConfigService(st, store.NewTTLCache())
 	if err != nil {
 		t.Fatalf("NewConfigService: %v", err)
 	}
 	// 关闭 AI：默认配置带开发 Key，避免测试触发真实网络请求
-	cfg.Get().AiApiKey = ""
 	// 关闭鉴权：现有测试不带凭证，密码置空即放行（发布版首次配置同款语义）
-	cfg.Get().Login.Password = ""
 	cache := store.NewTTLCache()
 	logger := log.New(64)
 	rss := service.NewRssService(cfg, logger)
@@ -278,8 +283,7 @@ func bcryptHash(t *testing.T, plain string) string {
 }
 
 func TestLoginWrongPassword(t *testing.T) {
-	s := newTestServer(t)
-	s.cfg.Get().Login.Password = bcryptHash(t, "secret")
+	s := newTestServerWithPassword(t, bcryptHash(t, "secret"))
 	w := doReq(t, s, http.MethodPost, "/api/login", map[string]interface{}{
 		"username": "admin",
 		"password": "wrong",
@@ -291,8 +295,7 @@ func TestLoginWrongPassword(t *testing.T) {
 }
 
 func TestLoginWrongUsername(t *testing.T) {
-	s := newTestServer(t)
-	s.cfg.Get().Login.Password = bcryptHash(t, "secret")
+	s := newTestServerWithPassword(t, bcryptHash(t, "secret"))
 	w := doReq(t, s, http.MethodPost, "/api/login", map[string]interface{}{
 		"username": "hacker",
 		"password": "secret",
@@ -304,8 +307,7 @@ func TestLoginWrongUsername(t *testing.T) {
 }
 
 func TestAuthRequired(t *testing.T) {
-	s := newTestServer(t)
-	s.cfg.Get().Login.Password = bcryptHash(t, "secret")
+	s := newTestServerWithPassword(t, bcryptHash(t, "secret"))
 	// 无 token 访问受保护端点应 401
 	w := doReq(t, s, http.MethodPost, "/api/config", nil)
 	if res := decodeResult(t, w); res.Code != 401 {
@@ -324,8 +326,7 @@ func TestAuthRequired(t *testing.T) {
 }
 
 func TestLoginAndAccess(t *testing.T) {
-	s := newTestServer(t)
-	s.cfg.Get().Login.Password = bcryptHash(t, "secret")
+	s := newTestServerWithPassword(t, bcryptHash(t, "secret"))
 	token := loginAndGetToken(t, s, "secret")
 	// 带 token 访问受保护端点成功
 	w := doReqAuth(t, s, http.MethodPost, "/api/config", nil, token)
@@ -344,8 +345,7 @@ func TestLoginAndAccess(t *testing.T) {
 }
 
 func TestLogout(t *testing.T) {
-	s := newTestServer(t)
-	s.cfg.Get().Login.Password = bcryptHash(t, "secret")
+	s := newTestServerWithPassword(t, bcryptHash(t, "secret"))
 	token := loginAndGetToken(t, s, "secret")
 	w := doReqAuth(t, s, http.MethodPost, "/api/logout", nil, token)
 	if res := decodeResult(t, w); res.Code != 200 {
@@ -359,10 +359,8 @@ func TestLogout(t *testing.T) {
 }
 
 func TestLegacyMD5PasswordUpgrade(t *testing.T) {
-	s := newTestServer(t)
-	// 模拟老配置：MD5 密码
 	legacy := fmt.Sprintf("%x", md5.Sum([]byte("admin")))
-	s.cfg.Get().Login.Password = legacy
+	s := newTestServerWithPassword(t, legacy)
 	token := loginAndGetToken(t, s, "admin")
 	if token == "" {
 		t.Fatal("MD5 密码登录应成功")

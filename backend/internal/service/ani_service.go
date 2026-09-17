@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/greenhats/anigo/internal/domain"
 	"github.com/greenhats/anigo/internal/util"
@@ -30,12 +29,11 @@ func NewAniService(cfg *ConfigService, rss *RssService, meta *MetadataService) *
 func (s *AniService) SetOnAdded(fn func(ani *domain.Ani)) { s.onAdded = fn }
 
 // pathResolve 返回下载路径的 bgmId/jpTitle 解析回调。
-func (s *AniService) pathResolve() func(ani *domain.Ani) (string, string) {
+func (s *AniService) pathResolve(ctx context.Context) func(ani *domain.Ani) (string, string) {
 	if s.meta == nil {
 		return nil
 	}
 	return func(ani *domain.Ani) (string, string) {
-		ctx := context.Background()
 		return s.meta.BgmSubjectId(ctx, ani), ani.JpTitle
 	}
 }
@@ -51,6 +49,13 @@ func (s *AniService) ListAni() *domain.ListAni {
 		if a == nil {
 			continue
 		}
+		visibleTasks := []domain.DownloadTask{}
+		for _, task := range a.DownloadTasks {
+			if taskProvider(task.Provider) == taskProvider(cfg.DownloadToolType) {
+				visibleTasks = append(visibleTasks, task)
+			}
+		}
+		a.DownloadTasks = visibleTasks
 		a.Pinyin = util.GetPinyin(a.Title)
 		a.PinyinInitials = util.GetPinyinInitials(a.Title)
 	}
@@ -129,42 +134,38 @@ func (s *AniService) ListAni() *domain.ListAni {
 func (s *AniService) AddAni(ani *domain.Ani) error {
 	if ani == nil {
 		ani = domain.DefaultAni()
+	} else {
+		ani = ani.Clone()
 	}
-	// 保留用户提交的字段，仅补充缺失的默认值
 	fillAniDefaultsFromAni(ani)
-	list := s.cfg.AniList()
-	for _, a := range list {
-		if a != nil && a.ID == ani.ID {
-			return fmt.Errorf("订阅已存在")
-		}
-	}
-	// 重复标题+季
-	for _, a := range list {
-		if a != nil && a.Title == ani.Title && a.Season == ani.Season {
-			if s.cfg.Get().Replace {
-				origID := a.ID
-				*a = *ani
-				a.ID = origID
-				return s.cfg.SaveAniList(list)
+	replace := s.cfg.Get().Replace
+	err := s.cfg.UpdateAniList(func(list *[]*domain.Ani) error {
+		for _, a := range *list {
+			if a == nil {
+				continue
 			}
-			return fmt.Errorf("已存在同名订阅")
+			if a.ID == ani.ID {
+				return fmt.Errorf("订阅已存在")
+			}
+			if a.Title == ani.Title && a.Season == ani.Season {
+				if !replace {
+					return fmt.Errorf("已存在同名订阅")
+				}
+				ani.ID = a.ID
+				ani.Downloaded, ani.DownloadedHash, ani.DownloadTasks = a.Downloaded, a.DownloadedHash, a.DownloadTasks
+				ani.DownloadedEps = a.DownloadedEps
+				*a = *ani
+				return nil
+			}
 		}
-	}
-	list = append(list, ani)
-	if err := s.cfg.SaveAniList(list); err != nil {
+		*list = append(*list, ani)
+		return nil
+	})
+	if err != nil {
 		return err
 	}
-	// 订阅后立即异步触发一轮下载（无需等后台轮询）
-	// 重新从内存列表查找真实指针传给下载，避免副本导致更新丢失
-	if s.onAdded != nil {
-		go func() {
-			time.Sleep(time.Second)
-			if real := s.FindAniByID(ani.ID); real != nil {
-				s.onAdded(real)
-			} else {
-				s.onAdded(ani)
-			}
-		}()
+	if s.onAdded != nil && ani.Enable {
+		s.onAdded(ani.Clone())
 	}
 	return nil
 }
@@ -175,35 +176,27 @@ func (s *AniService) SetAniRaw(raw []byte) error {
 	if err := json.Unmarshal(raw, &srcMap); err != nil {
 		return err
 	}
-	list := s.cfg.AniList()
-	for i, a := range list {
-		if a == nil {
-			continue
-		}
-		var id string
-		if v, ok := srcMap["id"].(string); ok {
-			id = v
-		}
-		if a.ID != id {
-			continue
-		}
-		title := strval(srcMap["title"])
-		season := intval(srcMap["season"])
-		// 重复标题+季检查（排除自身）
-		for j, other := range list {
-			if other == nil || j == i {
+	return s.cfg.UpdateAniList(func(listPtr *[]*domain.Ani) error {
+		list := *listPtr
+		id := strval(srcMap["id"])
+		for _, a := range list {
+			if a == nil || a.ID != id {
 				continue
 			}
-			if other.Title == title && other.Season == season {
-				return fmt.Errorf("订阅标题重复")
+			merged := a.Clone()
+			if err := MergeAniMap(merged, srcMap); err != nil {
+				return err
 			}
+			for _, other := range list {
+				if other != nil && other.ID != id && other.Title == merged.Title && other.Season == merged.Season {
+					return fmt.Errorf("订阅标题重复")
+				}
+			}
+			*a = *merged
+			return nil
 		}
-		if err := MergeAniMap(a, srcMap); err != nil {
-			return err
-		}
-		return s.cfg.SaveAniList(list)
-	}
-	return fmt.Errorf("订阅不存在")
+		return ErrAniNotFound
+	})
 }
 
 // fillAniDefaultsFromAni 为订阅补充缺失的默认字段，保留用户已提交的值。
@@ -271,42 +264,46 @@ func MergeAniMap(dst *domain.Ani, srcMap map[string]interface{}) error {
 	}
 	merged.CurrentEpisodeNumber = dst.CurrentEpisodeNumber
 	merged.LastDownloadTime = dst.LastDownloadTime
+	merged.Downloaded = dst.Downloaded
+	merged.DownloadedHash = dst.DownloadedHash
+	merged.DownloadedEps = dst.DownloadedEps
+	merged.DownloadTasks = dst.DownloadTasks
 	*dst = *merged
 	return nil
 }
 
 // DeleteAni 删除订阅。
-func (s *AniService) DeleteAni(ids []string) {
-	list := s.cfg.AniList()
-	var remaining []*domain.Ani
-	for _, a := range list {
-		if a == nil {
-			continue
+func (s *AniService) DeleteAni(ids []string) error {
+	return s.cfg.UpdateAniList(func(list *[]*domain.Ani) error {
+		remaining := make([]*domain.Ani, 0, len(*list))
+		for _, a := range *list {
+			if a != nil && !containsStr(ids, a.ID) {
+				remaining = append(remaining, a)
+			}
 		}
-		if containsStr(ids, a.ID) {
-			continue
-		}
-		remaining = append(remaining, a)
-	}
-	_ = s.cfg.SaveAniList(remaining)
+		*list = remaining
+		return nil
+	})
 }
 
-// BatchEnable 批量启用/停用订阅。
-func (s *AniService) BatchEnable(ids []string, value bool) {
-	list := s.cfg.AniList()
-	for _, a := range list {
-		if a == nil || !containsStr(ids, a.ID) {
-			continue
+func (s *AniService) BatchEnable(ids []string, value bool) error {
+	return s.cfg.UpdateAniList(func(list *[]*domain.Ani) error {
+		for _, a := range *list {
+			if a != nil && containsStr(ids, a.ID) {
+				a.Enable = value
+			}
 		}
-		a.Enable = value
-	}
-	_ = s.cfg.SaveAniList(list)
+		return nil
+	})
 }
 
 // PreviewAni 返回下载路径与条目（供 UI 预览）。
-func (s *AniService) PreviewAni(ani *domain.Ani) map[string]interface{} {
-	items := s.rss.GetItems(ani)
-	savePath := GetDownloadPath(s.cfg.Get(), ani, s.pathResolve())
+func (s *AniService) PreviewAni(ctx context.Context, ani *domain.Ani) (map[string]interface{}, error) {
+	items, err := s.rss.GetItems(ctx, ani)
+	if err != nil {
+		return nil, err
+	}
+	savePath := GetDownloadPath(s.cfg.Get(), ani, s.pathResolve(ctx))
 	omitItems := []int{}
 	preview := []*domain.Item{}
 	for _, it := range items {
@@ -317,13 +314,13 @@ func (s *AniService) PreviewAni(ani *domain.Ani) map[string]interface{} {
 		"downloadPath": savePath,
 		"items":        preview,
 		"omitList":     omitItems,
-	}
+	}, nil
 }
 
 // DownloadPathPreview 返回订阅解析出的下载路径。
-func (s *AniService) DownloadPathPreview(ani *domain.Ani) map[string]interface{} {
+func (s *AniService) DownloadPathPreview(ctx context.Context, ani *domain.Ani) map[string]interface{} {
 	return map[string]interface{}{
-		"downloadPath": GetDownloadPath(s.cfg.Get(), ani, s.pathResolve()),
+		"downloadPath": GetDownloadPath(s.cfg.Get(), ani, s.pathResolve(ctx)),
 	}
 }
 

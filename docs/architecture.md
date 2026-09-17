@@ -4,12 +4,12 @@
 
 ## 1. 背景与目标
 
-ani-rss-go 是一个"云端追番"工具：RSS 自动离线下载到网盘（当前主要 115），外置播放器直连播放。老项目是 ani-rss（Java）的精简 Go 重写，但保留了 Java 风格的**全局单例 + 函数钩子**来绕开循环依赖（如 `config.Get()`、`download.Type()`、`rename.BgmSubjectId = ...`）。
+ani-rss-go 是一个"云端追番"工具：RSS 自动离线下载到网盘（115 / PikPak），外置播放器直连播放。老项目是 ani-rss（Java）的精简 Go 重写，但保留了 Java 风格的**全局单例 + 函数钩子**来绕开循环依赖（如 `config.Get()`、`download.Type()`、`rename.BgmSubjectId = ...`）。
 
 本次重写目标：
 
 - **全新架构**：端口-适配器（Hexagonal），彻底根除全局单例和函数钩子，改用依赖注入
-- **可扩展下载器**：统一网盘接口，先实现 115，便于以后接阿里云盘等
+- **可扩展下载器**：统一网盘接口，支持 115 和 PikPak
 - **可插拔元数据与通知**：全部 provider 接口化
 - **前后端同仓分文件夹**：React + TypeScript
 - **保留 JSON 文件存储**：`config.v2.json` / `ani.v2.json` 契约兼容，便于从老项目迁移
@@ -58,7 +58,8 @@ anigo/
 │       │   └── notifier/         #   通知器（telegram/bark/serverchan/webhook/shell/system）
 │       ├── cloud/                # 【适配器】网盘
 │       │   ├── registry.go       #   CloudDriver 注册表
-│       │   └── driver_115/       #   115 实现（CloudDriver 接口见 domain/ports.go）
+│       │   ├── driver_115/       #   115 Cookie 鉴权
+│       │   └── driver_pikpak/    #   PikPak 账号登录、续期、文件和离线任务
 │       ├── httpapi/              # 【适配器】Gin HTTP 层（只做 HTTP 适配）
 │       │   ├── server.go         #   Gin 实例 + 中间件 + 路由注册
 │       │   ├── static.go         #   嵌入前端静态资源
@@ -111,7 +112,7 @@ type Cache interface {
 ### 5.2 网盘端口（统一网盘接口，关键设计）
 
 ```go
-// CloudDriver 统一网盘驱动接口。目前实现 driver_115，后续扩展其他网盘。
+// CloudDriver 统一网盘驱动接口。实现 driver_115 和 driver_pikpak。
 type CloudDriver interface {
     // 元数据
     Name() string
@@ -139,7 +140,7 @@ type CloudFile struct {
 // 填到配置的 pan115Cookie 字段。driver 在每次请求带上该 Cookie 完成鉴权。
 type CloudConfig struct {
     Pan115Cookie string // 115 浏览器 Cookie，驱动自己决定怎么用（如塞进 HTTP Header）
-    // 未来：Aliyun token、PikPak email/password...
+    // PikpakEmail / PikpakPassword：PikPak 账号和密码
 }
 ```
 
@@ -303,7 +304,9 @@ func (t *TaskManager) Stop() { t.cancel(); t.wg.Wait() }
 - 循环内每轮调用 service 时也透传 ctx，可被优雅中断
 - `runBgmLoop` 按配置 `bgmRefreshHours`（小时，缺省 6）调用 `MetadataService.RefreshAll` 刷新订阅的评分/总集数/已播出集数/封面（受 `UpdateTotalEpisodeNumber` / `ForceUpdateTotalEpisodeNumber` 配置控制）
 - `DownloadService.DownloadAni` / `SyncDownload` 透传 ctx 并在条目循环内检查 `ctx.Err()`，下载进行中收到 SIGTERM 时 `Stop()` 不会阻塞，可优雅中断
-- 离线下载是异步转存：`AddOfflineTask` 仅提交任务到 115，不做云端完成探测
+- 离线下载是异步转存：`AddOfflineTask` 仅提交任务；后续刷新通过可选 `OfflineTaskTracker` 端口查询完成/失败，持久化 `downloadTasks` 并按退避重试。
+- `RefreshQueue` 统一承接手动、定时、添加订阅的刷新请求，容量 128，按订阅 ID 合并重复任务；停机时取消并等待工作线程。
+- `ConfigService` 返回独立快照，业务写入经 `UpdateAni` / `UpdateAniList` 在同一临界区完成读取、修改和保存；保存失败不发布新内存状态。
 
 ## 8. HTTP 层（Gin）
 
@@ -359,7 +362,7 @@ frontend/
 **已确认决策**（见评审）：
 1. 分层：端口-适配器（Hexagonal）
 2. HTTP：Gin
-3. 下载器：统一 `CloudDriver` 接口，先实现 115
+3. 下载器：统一 `CloudDriver` 接口，支持 115 与 PikPak
 4. 元数据：全部 provider 接口化
 5. 通知：接口化多 notifier
 6. 并发：context + goroutine

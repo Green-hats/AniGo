@@ -143,7 +143,6 @@ func (s *MetadataService) RssToAni(ctx context.Context, dto *domain.RssToAniDTO)
 // 逐订阅独立请求，单个失败不中断其余；ctx 取消时提前结束（优雅停机）。
 func (s *MetadataService) RefreshAll(ctx context.Context, list []*domain.Ani) {
 	cfg := s.cfg.Get()
-	changed := false
 	for _, ani := range list {
 		if ctx.Err() != nil {
 			return
@@ -168,32 +167,40 @@ func (s *MetadataService) RefreshAll(ctx context.Context, list []*domain.Ani) {
 		}
 		if image != "" && image != ani.Image {
 			ani.Image = image
-			if cover := s.SaveCover(image); cover != "" {
+			if cover := s.SaveCover(ctx, image); cover != "" {
 				ani.Cover = cover
 			}
-			changed = true
 		}
 		if info.Rating.Score != 0 && info.Rating.Score != ani.Score {
 			ani.Score = info.Rating.Score
-			changed = true
 		}
 		total := s.bgm.GetEps(ctx, info)
 		if cfg.UpdateTotalEpisodeNumber && total > 0 && total != ani.TotalEpisodeNumber {
 			ani.TotalEpisodeNumber = total
-			changed = true
 		}
 		if cfg.ForceUpdateTotalEpisodeNumber && total > 0 {
 			ani.TotalEpisodeNumber = total
-			changed = true
 		}
 		aired := s.bgm.GetAiredEps(ctx, info)
 		if aired > 0 && aired != ani.BgmAiredEps {
 			ani.BgmAiredEps = aired
-			changed = true
 		}
-	}
-	if changed {
-		_ = s.cfg.SaveAniList(s.cfg.AniList())
+		if ctx.Err() != nil {
+			return
+		}
+		if err := s.cfg.UpdateAni(ani.ID, func(current *domain.Ani) error {
+			if current.BgmUrl != ani.BgmUrl {
+				return nil
+			}
+			current.Image, current.Cover, current.Score = ani.Image, ani.Cover, ani.Score
+			if cfg.UpdateTotalEpisodeNumber || cfg.ForceUpdateTotalEpisodeNumber {
+				current.TotalEpisodeNumber = ani.TotalEpisodeNumber
+			}
+			current.BgmAiredEps = ani.BgmAiredEps
+			return nil
+		}); err != nil {
+			return
+		}
 	}
 }
 
@@ -230,17 +237,17 @@ func (s *MetadataService) ToAni(ctx context.Context, info *domain.BgmInfo, ani *
 	}
 	ani.Image = image
 	if image != "" {
-		ani.Cover = s.SaveCover(image)
+		ani.Cover = s.SaveCover(ctx, image)
 	}
 	return ani
 }
 
 // SaveCover 下载封面到本地 files/ 并返回相对路径。
-func (s *MetadataService) SaveCover(imageURL string) string {
+func (s *MetadataService) SaveCover(ctx context.Context, imageURL string) string {
 	if imageURL == "" {
 		return ""
 	}
-	b, err := s.FetchImage(imageURL)
+	b, err := s.FetchImage(ctx, imageURL)
 	if err != nil {
 		return ""
 	}

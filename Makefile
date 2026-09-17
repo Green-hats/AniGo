@@ -2,7 +2,7 @@
 
 # 构建前端并拷贝到后端 embed 目录
 ui:
-	cd frontend && npm install && npm run build
+	cd frontend && npm ci && npm run build
 	rm -rf backend/internal/httpapi/static
 	mkdir -p backend/internal/httpapi/static
 	cp -r frontend/dist/. backend/internal/httpapi/static/
@@ -27,7 +27,7 @@ clean:
 	rm -rf frontend/node_modules frontend/dist backend/bin backend/internal/httpapi/static
 
 test:
-	cd backend && go vet ./... && go test ./...
+	cd backend && go vet ./... && go test -race ./...
 
 # 端到端集成测试（需要真实外部服务：AI/115/BGM/animes.garden）
 e2e:

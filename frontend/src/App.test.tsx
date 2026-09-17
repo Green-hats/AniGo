@@ -33,6 +33,7 @@ function mockFetchImpl({ authed }: { authed: boolean }) {
         json: async () => (authed ? checkLoginOkData : checkLoginUnauthorized),
       })
     }
+    if (url === '/api/refreshStatus') return Promise.resolve({ json: async () => ({ code: 200, data: [] }) })
     if (url === '/api/login') {
       return Promise.resolve({ json: async () => loginOkData })
     }

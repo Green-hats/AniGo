@@ -3,6 +3,7 @@ package domain
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"slices"
 )
 
 // Login 是 Config 内嵌的登录设置。密码以 MD5 哈希存储。
@@ -35,12 +36,12 @@ const (
 type NotificationTypeEnum string
 
 const (
-	NotifyServerChan  NotificationTypeEnum = "SERVER_CHAN"
-	NotifySystem      NotificationTypeEnum = "SYSTEM"
-	NotifyTelegram    NotificationTypeEnum = "TELEGRAM"
-	NotifyWebHook     NotificationTypeEnum = "WEB_HOOK"
-	NotifyShell       NotificationTypeEnum = "SHELL"
-	NotifyBark        NotificationTypeEnum = "BARK"
+	NotifyServerChan NotificationTypeEnum = "SERVER_CHAN"
+	NotifySystem     NotificationTypeEnum = "SYSTEM"
+	NotifyTelegram   NotificationTypeEnum = "TELEGRAM"
+	NotifyWebHook    NotificationTypeEnum = "WEB_HOOK"
+	NotifyShell      NotificationTypeEnum = "SHELL"
+	NotifyBark       NotificationTypeEnum = "BARK"
 )
 
 // ServerChanTypeEnum ServerChan 类型枚举。
@@ -53,116 +54,116 @@ const (
 
 // NotificationConfig 是一条通知渠道配置。
 type NotificationConfig struct {
-	Enable               bool                   `json:"enable"`
-	Retry                int                    `json:"retry"`
-	Comment              string                 `json:"comment"`
-	NotificationTemplate string                 `json:"notificationTemplate"`
-	NotificationType     NotificationTypeEnum   `json:"notificationType"`
-	ServerChanType       ServerChanTypeEnum     `json:"serverChanType"`
-	ServerChanSendKey    string                 `json:"serverChanSendKey"`
-	ServerChan3ApiUrl    string                 `json:"serverChan3ApiUrl"`
-	TelegramBotToken     string                 `json:"telegramBotToken"`
-	TelegramChatId       string                 `json:"telegramChatId"`
-	TelegramTopicId      int                    `json:"telegramTopicId"`
-	TelegramApiHost      string                 `json:"telegramApiHost"`
-	TelegramImage        bool                   `json:"telegramImage"`
-	TelegramFormat       string                 `json:"telegramFormat"`
-	WebHookMethod        string                 `json:"webHookMethod"`
-	WebHookUrl           string                 `json:"webHookUrl"`
-	WebHookHeader        string                 `json:"webHookHeader"`
-	WebHookBody          string                 `json:"webHookBody"`
-	Shell                string                 `json:"shell"`
-	BarkServerUrl        string                 `json:"barkServerUrl"`
-	BarkDeviceKeys       string                 `json:"barkDeviceKeys"`
-	BarkGroup            string                 `json:"barkGroup"`
-	BarkUseMarkdown      bool                   `json:"barkUseMarkdown"`
-	BarkLevel            string                 `json:"barkLevel"`
-	BarkVolume           int                    `json:"barkVolume"`
+	Enable               bool                     `json:"enable"`
+	Retry                int                      `json:"retry"`
+	Comment              string                   `json:"comment"`
+	NotificationTemplate string                   `json:"notificationTemplate"`
+	NotificationType     NotificationTypeEnum     `json:"notificationType"`
+	ServerChanType       ServerChanTypeEnum       `json:"serverChanType"`
+	ServerChanSendKey    string                   `json:"serverChanSendKey"`
+	ServerChan3ApiUrl    string                   `json:"serverChan3ApiUrl"`
+	TelegramBotToken     string                   `json:"telegramBotToken"`
+	TelegramChatId       string                   `json:"telegramChatId"`
+	TelegramTopicId      int                      `json:"telegramTopicId"`
+	TelegramApiHost      string                   `json:"telegramApiHost"`
+	TelegramImage        bool                     `json:"telegramImage"`
+	TelegramFormat       string                   `json:"telegramFormat"`
+	WebHookMethod        string                   `json:"webHookMethod"`
+	WebHookUrl           string                   `json:"webHookUrl"`
+	WebHookHeader        string                   `json:"webHookHeader"`
+	WebHookBody          string                   `json:"webHookBody"`
+	Shell                string                   `json:"shell"`
+	BarkServerUrl        string                   `json:"barkServerUrl"`
+	BarkDeviceKeys       string                   `json:"barkDeviceKeys"`
+	BarkGroup            string                   `json:"barkGroup"`
+	BarkUseMarkdown      bool                     `json:"barkUseMarkdown"`
+	BarkLevel            string                   `json:"barkLevel"`
+	BarkVolume           int                      `json:"barkVolume"`
 	StatusList           []NotificationStatusEnum `json:"statusList"`
-	Sort                 int64                  `json:"sort"`
+	Sort                 int64                    `json:"sort"`
 }
 
 // Config 是应用根配置，持久化为 config.v2.json。
 type Config struct {
-	DownloadToolType               string                `json:"downloadToolType"`
-	DownloadRetry                  int                   `json:"downloadRetry"`
-	PikpakEmail                    string                `json:"pikpakEmail"`
-	PikpakPassword                 string                `json:"pikpakPassword"`
-	Pan115Cookie                   string                `json:"pan115Cookie"`
-	DownloadPathTemplate           string                `json:"downloadPathTemplate"`
-	OvaDownloadPathTemplate        string                `json:"ovaDownloadPathTemplate"`
-	DelayedDownload                int                   `json:"delayedDownload"`
-	RssSleepMinutes                int                   `json:"rssSleepMinutes"`
-	Rename                         bool                  `json:"rename"`
-	Rss                            bool                  `json:"rss"`
-	RssTimeout                     int                   `json:"rssTimeout"`
-	FileExist                      bool                  `json:"fileExist"`
-	Offset                         bool                  `json:"offset"`
-	AutoDisabled                   bool                  `json:"autoDisabled"`
-	Skip5                          bool                  `json:"skip5"`
-	StandbyRss                     bool                  `json:"standbyRss"`
-	Coexist                        bool                  `json:"coexist"`
-	LogsMax                        int                   `json:"logsMax"`
+	DownloadToolType        string `json:"downloadToolType"`
+	DownloadRetry           int    `json:"downloadRetry"`
+	PikpakEmail             string `json:"pikpakEmail"`
+	PikpakPassword          string `json:"pikpakPassword"`
+	Pan115Cookie            string `json:"pan115Cookie"`
+	DownloadPathTemplate    string `json:"downloadPathTemplate"`
+	OvaDownloadPathTemplate string `json:"ovaDownloadPathTemplate"`
+	DelayedDownload         int    `json:"delayedDownload"`
+	RssSleepMinutes         int    `json:"rssSleepMinutes"`
+	Rename                  bool   `json:"rename"`
+	Rss                     bool   `json:"rss"`
+	RssTimeout              int    `json:"rssTimeout"`
+	FileExist               bool   `json:"fileExist"`
+	Offset                  bool   `json:"offset"`
+	AutoDisabled            bool   `json:"autoDisabled"`
+	Skip5                   bool   `json:"skip5"`
+	StandbyRss              bool   `json:"standbyRss"`
+	Coexist                 bool   `json:"coexist"`
+	LogsMax                 int    `json:"logsMax"`
 	// LogsLevel 日志级别（DEBUG/INFO/WARN/ERROR），低于该级别的日志不记录。
 	LogsLevel string `json:"logsLevel"`
 	// LogsFile 日志落盘文件路径（相对配置目录，空表示不落盘）。
-	LogsFile string `json:"logsFile"`
-	Debug                          bool                  `json:"debug"`
-	ProcrastinatingMasterOnly      bool                  `json:"procrastinatingMasterOnly"`
-	Proxy                          bool                  `json:"proxy"`
-	ProxyHost                      string                `json:"proxyHost"`
-	ProxyPort                      int                   `json:"proxyPort"`
-	ProxyUsername                  string                `json:"proxyUsername"`
-	ProxyPassword                  string                `json:"proxyPassword"`
-	Login                          Login                 `json:"login"`
-	MultiLoginForbidden            bool                  `json:"multiLoginForbidden"`
-	LoginEffectiveHours            int                   `json:"loginEffectiveHours"`
-	Exclude                        []string              `json:"exclude"`
-	ImportExclude                  bool                  `json:"importExclude"`
-	EnabledExclude                 bool                  `json:"enabledExclude"`
-	BgmJpName                      bool                  `json:"bgmJpName"`
-	IpWhitelist                    bool                  `json:"ipWhitelist"`
-	IpWhitelistStr                 string                `json:"ipWhitelistStr"`
-	Omit                           bool                  `json:"omit"`
-	BgmToken                       string                `json:"bgmToken"`
-	ApiKey                         string                `json:"apiKey"`
-	DownloadNew                    bool                  `json:"downloadNew"`
-	RenameTemplate                 string                `json:"renameTemplate"`
-	RenameDelYear                  bool                  `json:"renameDelYear"`
-	VerifyLoginIp                  bool                  `json:"verifyLoginIp"`
-	NotificationTemplate           string                `json:"notificationTemplate"`
-	BgmImage                       string                `json:"bgmImage"`
-	CustomCss                      string                `json:"customCss"`
-	CustomJs                       string                `json:"customJs"`
-	CustomEpisode                  bool                  `json:"customEpisode"`
-	CustomEpisodeStr               string                `json:"customEpisodeStr"`
-	CustomEpisodeGroupIndex        int                   `json:"customEpisodeGroupIndex"`
-	Procrastinating                bool                  `json:"procrastinating"`
-	ProcrastinatingDay             int                   `json:"procrastinatingDay"`
-	UpdateTotalEpisodeNumber       bool                  `json:"updateTotalEpisodeNumber"`
-	ForceUpdateTotalEpisodeNumber  bool                  `json:"forceUpdateTotalEpisodeNumber"`
-	DownloadTimeout                int                   `json:"downloadTimeout"`
-	NotificationConfigList         []NotificationConfig  `json:"notificationConfigList"`
-	CopyMasterToStandby            bool                  `json:"copyMasterToStandby"`
-	SortType                       string                `json:"sortType"`
-	Replace                        bool                  `json:"replace"`
-	MaxFileNameLength              int                   `json:"maxFileNameLength"`
-	LimitLoginAttempts             bool                  `json:"limitLoginAttempts"`
-	GitInfo                        *GitInfo              `json:"gitInfo"`
-	ReverseProxyTrustIpListEnabled bool                  `json:"reverseProxyTrustIpListEnabled"`
-	ReverseProxyTrustIpList        []string              `json:"reverseProxyTrustIpList"`
-	BgmApi                         string                `json:"bgmApi"`
-	AllowCors                      bool                  `json:"allowCors"`
-	UUID                           string                `json:"uuid"`
+	LogsFile                       string               `json:"logsFile"`
+	Debug                          bool                 `json:"debug"`
+	ProcrastinatingMasterOnly      bool                 `json:"procrastinatingMasterOnly"`
+	Proxy                          bool                 `json:"proxy"`
+	ProxyHost                      string               `json:"proxyHost"`
+	ProxyPort                      int                  `json:"proxyPort"`
+	ProxyUsername                  string               `json:"proxyUsername"`
+	ProxyPassword                  string               `json:"proxyPassword"`
+	Login                          Login                `json:"login"`
+	MultiLoginForbidden            bool                 `json:"multiLoginForbidden"`
+	LoginEffectiveHours            int                  `json:"loginEffectiveHours"`
+	Exclude                        []string             `json:"exclude"`
+	ImportExclude                  bool                 `json:"importExclude"`
+	EnabledExclude                 bool                 `json:"enabledExclude"`
+	BgmJpName                      bool                 `json:"bgmJpName"`
+	IpWhitelist                    bool                 `json:"ipWhitelist"`
+	IpWhitelistStr                 string               `json:"ipWhitelistStr"`
+	Omit                           bool                 `json:"omit"`
+	BgmToken                       string               `json:"bgmToken"`
+	ApiKey                         string               `json:"apiKey"`
+	DownloadNew                    bool                 `json:"downloadNew"`
+	RenameTemplate                 string               `json:"renameTemplate"`
+	RenameDelYear                  bool                 `json:"renameDelYear"`
+	VerifyLoginIp                  bool                 `json:"verifyLoginIp"`
+	NotificationTemplate           string               `json:"notificationTemplate"`
+	BgmImage                       string               `json:"bgmImage"`
+	CustomCss                      string               `json:"customCss"`
+	CustomJs                       string               `json:"customJs"`
+	CustomEpisode                  bool                 `json:"customEpisode"`
+	CustomEpisodeStr               string               `json:"customEpisodeStr"`
+	CustomEpisodeGroupIndex        int                  `json:"customEpisodeGroupIndex"`
+	Procrastinating                bool                 `json:"procrastinating"`
+	ProcrastinatingDay             int                  `json:"procrastinatingDay"`
+	UpdateTotalEpisodeNumber       bool                 `json:"updateTotalEpisodeNumber"`
+	ForceUpdateTotalEpisodeNumber  bool                 `json:"forceUpdateTotalEpisodeNumber"`
+	DownloadTimeout                int                  `json:"downloadTimeout"`
+	NotificationConfigList         []NotificationConfig `json:"notificationConfigList"`
+	CopyMasterToStandby            bool                 `json:"copyMasterToStandby"`
+	SortType                       string               `json:"sortType"`
+	Replace                        bool                 `json:"replace"`
+	MaxFileNameLength              int                  `json:"maxFileNameLength"`
+	LimitLoginAttempts             bool                 `json:"limitLoginAttempts"`
+	GitInfo                        *GitInfo             `json:"gitInfo"`
+	ReverseProxyTrustIpListEnabled bool                 `json:"reverseProxyTrustIpListEnabled"`
+	ReverseProxyTrustIpList        []string             `json:"reverseProxyTrustIpList"`
+	BgmApi                         string               `json:"bgmApi"`
+	AllowCors                      bool                 `json:"allowCors"`
+	UUID                           string               `json:"uuid"`
 	// BgmRefreshHours BGM 元数据后台刷新周期（小时）。
-	BgmRefreshHours                int                   `json:"bgmRefreshHours"`
+	BgmRefreshHours int `json:"bgmRefreshHours"`
 	// AI 设置：用云端大模型解析/过滤 RSS 标题
-	AiEnabled   bool   `json:"aiEnabled"`
-	AiProvider  string `json:"aiProvider"`
-	AiApiKey    string `json:"aiApiKey"`
-	AiBaseURL   string `json:"aiBaseURL"`
-	AiModel     string `json:"aiModel"`
-	AiPrompt    string `json:"aiPrompt"`
+	AiEnabled  bool   `json:"aiEnabled"`
+	AiProvider string `json:"aiProvider"`
+	AiApiKey   string `json:"aiApiKey"`
+	AiBaseURL  string `json:"aiBaseURL"`
+	AiModel    string `json:"aiModel"`
+	AiPrompt   string `json:"aiPrompt"`
 	// AiSubtitleSC 是否仅保留含简体中文字幕的资源（简中或简中双语视为满足）。
 	AiSubtitleSC bool `json:"aiSubtitleSC"`
 }
@@ -208,48 +209,67 @@ ${emoji}${emoji}${emoji}`
 // DefaultConfig 返回与遗留 ConfigUtil 静态块一致的默认配置。
 func DefaultConfig() *Config {
 	return &Config{
-		DownloadToolType:            "115",
-		Pan115Cookie:                "",
-		DownloadRetry:               3,
-		DownloadPathTemplate:        "番剧/${title}/Season ${season}",
-		OvaDownloadPathTemplate:     "剧场版/${title}",
-		RssSleepMinutes:             15,
-		Rename:                      true,
-		Rss:                         true,
-		RssTimeout:                  20,
-		Skip5:                       true,
-		LogsMax:                     128,
-		LogsLevel:                   "INFO",
-		LogsFile:                    "",
-		ProcrastinatingMasterOnly:   true,
-		ProxyPort:                   8080,
-		Login:                       Login{Username: "admin", Password: md5Hex("admin")},
-		MultiLoginForbidden:         true,
-		LoginEffectiveHours:         3,
-		Exclude:                     []string{"720[Pp]", "\\d-\\d", "合集", "特别篇"},
-		Omit:                        true,
-		CustomEpisodeGroupIndex:     2,
-		CustomEpisodeStr:            renameRegStr,
-		ProcrastinatingDay:          14,
-		UpdateTotalEpisodeNumber:    true,
-		DownloadTimeout:             60,
-		SortType:                    "SCORE",
-		LimitLoginAttempts:          true,
-		ReverseProxyTrustIpList:     []string{"127.0.0.1"},
-		BgmApi:                      "https://api.bgm.tv",
-		BgmRefreshHours:             6,
-		AiEnabled:                   true,
-		AiProvider:                  "deepseek",
-		AiApiKey:                    "",
-		AiBaseURL:                   "https://api.deepseek.com",
-		AiModel:                     "deepseek-v4-flash",
-		AiPrompt:                    defaultAiPrompt,
-		AiSubtitleSC:                true,
-		NotificationTemplate:        defaultNotificationTemplate,
+		DownloadToolType:          "115",
+		Pan115Cookie:              "",
+		DownloadRetry:             3,
+		DownloadPathTemplate:      "番剧/${title}/Season ${season}",
+		OvaDownloadPathTemplate:   "剧场版/${title}",
+		RssSleepMinutes:           15,
+		Rename:                    true,
+		Rss:                       true,
+		RssTimeout:                20,
+		Skip5:                     true,
+		LogsMax:                   128,
+		LogsLevel:                 "INFO",
+		LogsFile:                  "",
+		ProcrastinatingMasterOnly: true,
+		ProxyPort:                 8080,
+		Login:                     Login{Username: "admin", Password: md5Hex("admin")},
+		MultiLoginForbidden:       true,
+		LoginEffectiveHours:       3,
+		Exclude:                   []string{"720[Pp]", "\\d-\\d", "合集", "特别篇"},
+		Omit:                      true,
+		CustomEpisodeGroupIndex:   2,
+		CustomEpisodeStr:          renameRegStr,
+		ProcrastinatingDay:        14,
+		UpdateTotalEpisodeNumber:  true,
+		DownloadTimeout:           60,
+		SortType:                  "SCORE",
+		LimitLoginAttempts:        true,
+		ReverseProxyTrustIpList:   []string{"127.0.0.1"},
+		BgmApi:                    "https://api.bgm.tv",
+		BgmRefreshHours:           6,
+		AiEnabled:                 true,
+		AiProvider:                "deepseek",
+		AiApiKey:                  "",
+		AiBaseURL:                 "https://api.deepseek.com",
+		AiModel:                   "deepseek-v4-flash",
+		AiPrompt:                  defaultAiPrompt,
+		AiSubtitleSC:              true,
+		NotificationTemplate:      defaultNotificationTemplate,
 	}
 }
 
 func md5Hex(s string) string {
 	h := md5.Sum([]byte(s))
 	return hex.EncodeToString(h[:])
+}
+
+// Clone 返回独立配置快照，包含通知渠道内部的状态列表。
+func (c *Config) Clone() *Config {
+	if c == nil {
+		return nil
+	}
+	out := *c
+	if c.GitInfo != nil {
+		git := *c.GitInfo
+		out.GitInfo = &git
+	}
+	out.Exclude = slices.Clone(c.Exclude)
+	out.ReverseProxyTrustIpList = slices.Clone(c.ReverseProxyTrustIpList)
+	out.NotificationConfigList = slices.Clone(c.NotificationConfigList)
+	for i := range out.NotificationConfigList {
+		out.NotificationConfigList[i].StatusList = slices.Clone(c.NotificationConfigList[i].StatusList)
+	}
+	return &out
 }

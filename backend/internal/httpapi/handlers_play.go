@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/greenhats/anigo/internal/cloud/driver_pikpak"
 )
 
 // videoMimeType 按文件扩展名返回常见的视频 MIME 类型（取不到返回空串）。
@@ -42,8 +43,8 @@ func videoMimeType(path string) string {
 // 代理转发时必须使用相同 UA 才能取流。
 const ua115 = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 
-// handleFileProxy 通过 pickcode 代理转发 115 云端文件的播放流。
-// 外部播放器（mpv 等）只访问本地端点，由本服务用 115 UA 拉取 CDN 流并转发
+// handleFileProxy 通过 pickcode / 文件 ID 代理转发云端文件的播放流。
+// 外部播放器（mpv 等）只访问本地端点，由本服务用对应网盘的 UA 拉取 CDN 流并转发
 // （支持 Range，便于 seek），从而绕过 115 CDN 的 UA 绑定与鉴权问题。
 // 请求：GET /api/file?pickcode=xxx
 func (s *Server) handleFileProxy(c *gin.Context) {
@@ -61,16 +62,20 @@ func (s *Server) handleFileProxy(c *gin.Context) {
 	if c.Request.Method == http.MethodHead {
 		method = http.MethodHead
 	}
-	req, err := http.NewRequest(method, rawURL, nil)
+	req, err := http.NewRequestWithContext(c.Request.Context(), method, rawURL, nil)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"message": err.Error()})
 		return
 	}
-	req.Header.Set("User-Agent", ua115)
+	userAgent := ua115
+	if strings.EqualFold(s.cfg.Get().DownloadToolType, "pikpak") {
+		userAgent = driverpikpak.UserAgent
+	}
+	req.Header.Set("User-Agent", userAgent)
 	if rng := c.GetHeader("Range"); rng != "" {
 		req.Header.Set("Range", rng)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.streamClient.Do(req)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"message": err.Error()})
 		return

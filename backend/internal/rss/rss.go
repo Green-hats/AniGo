@@ -1,6 +1,7 @@
 package rss
 
 import (
+	"context"
 	"encoding/xml"
 	"errors"
 	"io"
@@ -15,20 +16,20 @@ import (
 )
 
 var (
-	regMagnet    = regexp.MustCompile(`^magnet:\?xt=urn:btih:(\w+)`)
-	regEd2k      = regexp.MustCompile(`^ed2k://\|file\|([^|]+)\|(\d+)\|([A-Fa-f0-9]{32})\|/$`)
-	regGuidHex   = regexp.MustCompile(`^([a-z]|[0-9])+$`)
+	regMagnet  = regexp.MustCompile(`^magnet:\?xt=urn:btih:(\w+)`)
+	regEd2k    = regexp.MustCompile(`^ed2k://\|file\|([^|]+)\|(\d+)\|([A-Fa-f0-9]{32})\|/$`)
+	regGuidHex = regexp.MustCompile(`^([a-z]|[0-9])+$`)
 )
 
 // xmlItem 是原始 RSS 条目。
 type xmlItem struct {
-	Title     string     `xml:"title"`
-	Link      string     `xml:"link"`
-	GUID      string     `xml:"guid"`
-	PubDate   string     `xml:"pubDate"`
-	Enclosure *enclosure `xml:"enclosure"`
-	NyaaSize  string     `xml:"nyaa:size"`
-	NyaaHash  string     `xml:"nyaa:infoHash"`
+	Title     string      `xml:"title"`
+	Link      string      `xml:"link"`
+	GUID      string      `xml:"guid"`
+	PubDate   string      `xml:"pubDate"`
+	Enclosure *enclosure  `xml:"enclosure"`
+	NyaaSize  string      `xml:"nyaa:size"`
+	NyaaHash  string      `xml:"nyaa:infoHash"`
 	Torrent   *xmlTorrent `xml:"torrent"`
 }
 
@@ -51,7 +52,7 @@ type rssDocument struct {
 }
 
 // GetRSS 抓取并校验 RSS XML 内容。
-func GetRSS(cfg *domain.Config, rawURL string) (string, error) {
+func GetRSS(ctx context.Context, cfg *domain.Config, rawURL string) (string, error) {
 	timeout := cfg.RssTimeout
 	if timeout <= 0 {
 		timeout = 20
@@ -61,6 +62,7 @@ func GetRSS(cfg *domain.Config, rawURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	req = req.WithContext(ctx)
 	req.Header.Set("User-Agent", util.UserAgent())
 	resp, err := util.ClientFor(cfg, timeout).Do(req)
 	if err != nil {
@@ -176,7 +178,7 @@ func Parse(ani *domain.Ani, rssURL, subgroupName, body string) []*domain.Item {
 
 		it := &domain.Item{
 			Subgroup:   subgroupName,
-			Episode:    1.0,
+			Episode:    0,
 			Title:      itemTitle,
 			ReName:     itemTitle,
 			Torrent:    torrent,

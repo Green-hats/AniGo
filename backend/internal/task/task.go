@@ -37,6 +37,7 @@ func (t *TaskManager) Start() {
 	}
 	t.running = true
 	t.ctx, t.cancel = context.WithCancel(context.Background())
+	t.download.StartBackground(t.ctx)
 	t.wg.Add(2)
 	go t.runRSSLoop()
 	go t.runBgmLoop()
@@ -54,6 +55,7 @@ func (t *TaskManager) Stop() {
 	}
 	t.running = false
 	t.cancel()
+	t.download.StopBackground()
 	t.wg.Wait()
 	if t.logger != nil {
 		t.logger.Info("task", "后台任务已停止")
@@ -66,7 +68,9 @@ func (t *TaskManager) runRSSLoop() {
 	for {
 		cfg := t.cfg.Get()
 		if cfg.Rss {
-			t.download.SyncDownload(t.ctx, t.cfg.AniList())
+			if err := t.download.EnqueueAll(); err != nil && t.logger != nil {
+				t.logger.Error("task", err.Error())
+			}
 		}
 		interval := time.Duration(cfg.RssSleepMinutes) * time.Minute
 		if interval <= 0 {

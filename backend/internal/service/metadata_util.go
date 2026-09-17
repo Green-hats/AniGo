@@ -1,6 +1,10 @@
 package service
 
 import (
+	"context"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -13,8 +17,20 @@ import (
 const minute = time.Minute
 
 // FetchImage 下载图片字节（用普通 HTTP 客户端）。
-func (s *MetadataService) FetchImage(rawURL string) ([]byte, error) {
-	return util.GetBytes(s.cfg.Get(), rawURL)
+func (s *MetadataService) FetchImage(ctx context.Context, rawURL string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := util.ClientFor(s.cfg.Get(), 20).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("cover HTTP %s", resp.Status)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, 20<<20))
 }
 
 // coverRelPath 根据图片 URL 生成 files/ 下的相对路径。

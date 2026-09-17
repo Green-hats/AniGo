@@ -73,7 +73,7 @@ func GetDownloadPath(cfg *domain.Config, ani *domain.Ani, resolve func(ani *doma
 
 	// bgmId / jpTitle 需要外部元数据，通过回调提供；未提供时保持空白
 	bgmID, jpTitle := "", ani.JpTitle
-	if resolve != nil {
+	if resolve != nil && (strings.Contains(tmpl, "${bgmId}") || strings.Contains(tmpl, "${jpTitle}")) {
 		bgmID, jpTitle = resolve(ani)
 		if jpTitle == "" {
 			jpTitle = ani.JpTitle

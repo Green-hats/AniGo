@@ -10,6 +10,8 @@ import {
   Typography,
   message,
   Popconfirm,
+  Alert,
+  Skeleton,
 } from 'antd'
 import { api } from '../api/client'
 import type { GardenGroup } from '../types'
@@ -21,8 +23,8 @@ export default function GardenPage() {
   const [selected, setSelected] = useState<string | null>(null)
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null)
   const [subscribing, setSubscribing] = useState(false)
-  const { data: weeks } = useQuery({ queryKey: ['gardenList'], queryFn: api.gardenList })
-  const { data: groups, isLoading: groupsLoading } = useQuery({
+  const { data: weeks, isPending, error, refetch } = useQuery({ queryKey: ['gardenList'], queryFn: api.gardenList })
+  const { data: groups, isLoading: groupsLoading, error: groupsError } = useQuery({
     queryKey: ['gardenGroup', selected],
     queryFn: () => api.gardenGroup(selected!),
     enabled: !!selected,
@@ -53,6 +55,8 @@ export default function GardenPage() {
       <Typography.Title level={4} style={{ marginBottom: 16 }}>
         番剧源
       </Typography.Title>
+      {isPending && <Skeleton active />}
+      {error && <Alert type="error" title="番剧源加载失败" description={error.message} action={<Button onClick={() => refetch()}>重试</Button>} />}
       {!weeks ? null : (
       <Collapse
         defaultActiveKey={weeks.map((_, i) => String(i))}
@@ -79,6 +83,7 @@ export default function GardenPage() {
         onClose={() => setSelected(null)}
         width={620}
       >
+        {groupsError && <Alert type="error" title="资源加载失败" description={groupsError.message} />}
         <List
           loading={groupsLoading}
           dataSource={groups}
@@ -110,6 +115,7 @@ export default function GardenPage() {
         onClose={() => setSelectedGroup(null)}
         width={680}
       >
+        {groupsError && <Alert type="error" title="资源加载失败" description={groupsError.message} />}
         <List
           loading={groupsLoading}
           dataSource={groups?.find((g) => g.id === selectedGroup)?.items ?? []}

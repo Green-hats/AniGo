@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/greenhats/anigo/internal/cloud/driver_115"
+	"github.com/greenhats/anigo/internal/cloud/driver_pikpak"
 	"github.com/greenhats/anigo/internal/domain"
 )
 
@@ -12,14 +13,15 @@ func init() {
 	// 注册 115 网盘驱动（默认）
 	Register("115", driver115.New)
 	Register("pan115", driver115.New)
+	Register("pikpak", driverpikpak.New)
 }
 
 // DriverFactory 是网盘驱动的工厂函数。
 type DriverFactory func() domain.CloudDriver
 
 var (
-	mu        sync.RWMutex
-	registry  = map[string]DriverFactory{}
+	mu       sync.RWMutex
+	registry = map[string]DriverFactory{}
 )
 
 // Register 注册一个网盘驱动。name 不区分大小写。

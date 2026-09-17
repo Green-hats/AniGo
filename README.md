@@ -43,11 +43,11 @@
     </tr>
   </thead>
   <tbody>
-    <tr><td align="center"><b>云端追番</b></td><td>RSS 自动离线下载到 115 网盘，本地零存储</td></tr>
+    <tr><td align="center"><b>云端追番</b></td><td>RSS 自动离线下载到 115 / PikPak 网盘，本地零存储</td></tr>
     <tr><td align="center"><b>AI 解析</b></td><td>DeepSeek 等大模型批量解析标题，提取集数 / 分辨率 / 字幕组 / 选版信号，同步完成规则与简中字幕筛选</td></tr>
     <tr><td align="center"><b>智能选版</b></td><td>同集多版本自动择优（分辨率 > 压制源 > 编码 > 色深 > 字幕嵌入/语言），每集不重复下载</td></tr>
     <tr><td align="center"><b>四源聚合</b></td><td><a href="https://animes.garden">animes.garden</a>（動漫花園 + 蜜柑 + 萌番组 + ANi 聚合）作番剧源</td></tr>
-    <tr><td align="center"><b>在线播放</b></td><td>首页直接调用系统播放器（mpv 等）经本地代理播放 115 云端文件，无需下载</td></tr>
+    <tr><td align="center"><b>在线播放</b></td><td>首页直接调用系统播放器（mpv 等）经本地代理播放 115 / PikPak 云端文件，无需下载</td></tr>
     <tr><td align="center"><b>元数据</b></td><td>Bangumi 评分 / 季数 / 总集数、封面下载，后台定时刷新（周期可配）</td></tr>
     <tr><td align="center"><b>通知</b></td><td>Telegram / Bark / ServerChan / WebHook / Shell / 系统日志</td></tr>
     <tr><td align="center"><b>单二进制</b></td><td>前端 React 构建产物嵌入后端，一个 <code>anigo</code> 搞定</td></tr>
@@ -55,7 +55,7 @@
 </table>
 
 > [!NOTE]
-> 目前仅支持 **115 网盘**离线下载；**PikPak** 正在开发中。个人开发速度未知，欢迎大家贡献！
+> 支持 **115 网盘**（Cookie）和 **PikPak**（邮箱/手机号与密码）离线下载，可在「设置 → 下载」中选择。
 
 ## 快速开始
 
@@ -95,7 +95,7 @@ make dev    # 后端 :7789 + Vite 热更新 :37789（/api 自动代理）
 ### 测试
 
 ```bash
-make test                      # 后端：go vet ./... && go test ./...
+make test                      # 后端：go vet ./... && go test -race ./...
 cd frontend && npm run test    # 前端：vitest（组件/API）
 cd frontend && npm run lint    # 前端：eslint 静态检查
 cd frontend && npm run test:coverage  # 前端：vitest + 覆盖率（阈值 40%）
@@ -118,10 +118,10 @@ CONFIG=/data/anigo ./anigo-linux-amd64  # 自定义配置目录
 
 Windows 直接运行 `anigo-windows-amd64.exe`（参数相同）。首次启动自动生成配置，浏览器打开 `http://服务器:7789`，默认账号 `admin` / `admin`。
 
-产生文件（均在配置目录）：`config.v2.json`（主配置）、`ani.v2.json`（订阅列表）、`files/`（封面缓存）、`logs/`（可选日志落盘）；日志默认在内存中，视频全部离线下载到 115 云盘，本地零存储。
+产生文件（均在配置目录）：`config.v2.json`（主配置）、`ani.v2.json`（订阅列表）、`files/`（封面缓存）、`logs/`（可选日志落盘）；日志默认在内存中，视频全部离线下载到所选网盘，本地零存储。
 
 > [!NOTE]
-> 发布版二进制内嵌的默认密钥为空，需在网页「设置」里自行填入 115 Cookie 与 AI Key。
+> 发布版二进制内嵌的默认密钥为空，需在网页「设置」里自行填入所选网盘凭据与 AI Key。
 
 ## 配置指南
 
@@ -225,6 +225,29 @@ graph LR
 | 日志 | `log/slog` 结构化日志 |
 
 > 详见 [`docs/architecture.md`](docs/architecture.md) 与 [`docs/pipeline.md`](docs/pipeline.md)。
+
+## PikPak 配置
+
+1. 打开「设置 → 下载」，选择 **PikPak**。
+2. 填写 PikPak 账号和密码；手机号需包含国家区号，例如 `+86138…`。第三方登录账号需先在 PikPak 设置可用于账号登录的密码。
+3. 点击「测试 PikPak 登录」，成功后点击「保存」。测试使用当前表单，不会保存配置。
+4. 后续刷新会在 PikPak 创建下载目录、提交磁力任务，并在之后的刷新中确认云端完成状态。首页播放支持 PikPak 文件。
+
+驱动参考 [52funny/pikpakcli](https://github.com/52funny/pikpakcli) 的登录、验证和文件接口，直接集成于 Go 服务，无需额外安装 CLI。会话在内存中缓存并自动续期；服务重启后重新登录。上游若要求人工验证，会返回明确提示，需先在官方客户端完成验证。
+
+切换网盘后，旧网盘的未完成任务会保留，切回后继续查询与重试；新任务使用当前网盘。历史已完成集数保持不变，文件不会自动迁移或重新下载。播放凭证绑定网盘与凭据，切换后需重新点击播放。
+
+协议参考版本：`pikpakcli@560f263661fc55e40e508fe8e0d4b151c855dcbd`。上游 MIT 许可保留在 [`LICENSE.pikpakcli`](backend/internal/cloud/driver_pikpak/LICENSE.pikpakcli)。离线任务查询与原地重试字段另外参考 [pikpak-go 的任务接口](https://github.com/lyqingye/pikpak-go/blob/main/api.go)。
+
+## 下载状态与刷新行为
+
+- 新任务区分待提交、已提交、完成和失败。网盘接受离线任务只表示“已提交”；后续刷新查询云端任务状态，确认完成后才增加已完成集数、判断订阅完结。
+- 失败任务保存原磁力和目标路径，按 `downloadRetry` 限制重试次数（不含首次提交），使用 1～64 分钟退避，在后续刷新时重试。115 重试仅清理失败任务记录；PikPak 原地重试失败任务，均保留网盘文件。
+- 已提交但无法在云端列表确认的任务保持待确认，不推测完成。历史版本的 `downloaded` / `downloadedHash` 记录保留兼容，不会自动重新下载。
+- 定时刷新、手动刷新、添加订阅共用有界队列；同一订阅重复刷新会合并。首页展示任务执行状态、失败原因，并自动更新进度。
+- AI 解析缓存保留 24 小时、最多 10000 个标题；模型、提示词、筛选规则或凭据变化后重新解析。每批最多 32 个新标题，缓存仅驻留内存。
+- mpv 播放前申请单文件凭证，有效期 3 小时。凭证仅能读取该文件，不能调用管理接口；服务重启或登录密码、网盘类型或凭据变化后失效。过期后从首页重新点击播放即可。
+- 备份导入要求同时包含配置和订阅 JSON，支持恢复封面和 torrents 附件。上传最大 50 MiB，解压总量最大 100 MiB；校验全部通过后才提交，提交失败时回滚。运行中的下载完成或取消后才执行恢复。
 
 ## License
 

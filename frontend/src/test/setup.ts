@@ -56,3 +56,15 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: vi.fn(),
   })),
 })
+
+// jsdom 不执行布局；保留组件生命周期，只替代浏览器布局观察接口。
+class TestResizeObserver implements ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+Object.defineProperty(globalThis, 'ResizeObserver', { value: TestResizeObserver, configurable: true })
+Object.defineProperty(window, 'ResizeObserver', { value: TestResizeObserver, configurable: true })
+const nativeGetComputedStyle = window.getComputedStyle.bind(window)
+// jsdom 不支持伪元素计算样式，普通元素样式仍由 jsdom 计算。
+window.getComputedStyle = (element) => nativeGetComputedStyle(element)

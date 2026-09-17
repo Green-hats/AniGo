@@ -28,7 +28,7 @@ func (s *NotifyService) Send(ctx context.Context, ani *domain.Ani, text string, 
 	s.registry.Dispatch(ctx, s.cfg.Get(), &domain.Notification{
 		Text:   text,
 		Status: status,
-		Ani:    ani,
+		Ani:    ani.Clone(),
 	})
 }
 

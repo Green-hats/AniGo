@@ -36,7 +36,7 @@ type Fetcher struct {
 	// Req 是可替换的底层请求函数（默认指向 request，测试可注入）。
 	Req func(ctx context.Context, method, rawURL string, body io.Reader, contentType string) ([]byte, int, error)
 
-	mu        sync.Mutex
+	mu         sync.Mutex
 	httpClient *http.Client
 }
 
@@ -64,9 +64,11 @@ func (f *Fetcher) request(ctx context.Context, method, rawURL string, body io.Re
 		return nil, 0, err
 	}
 	req.Header.Set("User-Agent", util.UserAgent())
+	f.mu.Lock()
 	for k, v := range f.Header {
 		req.Header.Set(k, v)
 	}
+	f.mu.Unlock()
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
@@ -117,4 +119,15 @@ type HTTPError struct {
 
 func (e *HTTPError) Error() string {
 	return fmt.Sprintf("http %d: %s", e.Status, e.Body)
+}
+
+// SetHeaders 与请求读取共用锁，支持配置热更新。
+func (f *Fetcher) SetHeaders(headers map[string]string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Header = headers
+	if f.httpClient != nil {
+		f.httpClient.CloseIdleConnections()
+	}
+	f.httpClient = nil
 }

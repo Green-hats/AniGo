@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Tabs, Form, Input, Switch, InputNumber, Button, Divider, message, Space, Select, Card, Upload } from 'antd'
+import { Tabs, Form, Input, Switch, InputNumber, Button, Divider, message, Space, Select, Card, Upload, Alert, Skeleton } from 'antd'
 import { DeleteOutlined, PlusOutlined, SendOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons'
 import { api } from '../api/client'
 import type { Config, NotificationConfig } from '../types'
@@ -138,20 +138,23 @@ function renderChannelFields(name: number, type?: string) {
 }
 
 export default function SettingsPage() {
-  const { data: cfg } = useQuery({ queryKey: ['config'], queryFn: api.getConfig })
+  const { data: cfg, isPending, error, refetch } = useQuery({ queryKey: ['config'], queryFn: api.getConfig })
   const queryClient = useQueryClient()
   const [form] = Form.useForm<Config>()
   const [saving, setSaving] = useState(false)
+  const [testingDownload, setTestingDownload] = useState(false)
+  const downloadTool = Form.useWatch('downloadToolType', { form, preserve: true }) ?? cfg?.downloadToolType ?? '115'
 
   useEffect(() => {
     if (cfg) form.setFieldsValue(cfg)
   }, [cfg, form])
 
   const handleSave = async () => {
-    const values = form.getFieldsValue()
     setSaving(true)
     try {
-      await api.setConfig(values)
+      await form.validateFields()
+      await api.setConfig(form.getFieldsValue(true))
+      await queryClient.invalidateQueries({ queryKey: ['config'] })
       message.success('已保存')
     } catch (e) {
       message.error((e as Error).message)
@@ -169,19 +172,24 @@ export default function SettingsPage() {
     }
   }
 
-  const handle115Test = async () => {
+  const handleDownloadTest = async () => {
+    setTestingDownload(true)
     try {
-      await api.downloadLoginTest(form.getFieldValue('pan115Cookie'))
-      message.success('115 登录成功')
+      await api.downloadLoginTest({
+        downloadToolType: downloadTool,
+        pan115Cookie: form.getFieldValue('pan115Cookie'),
+        pikpakEmail: form.getFieldValue('pikpakEmail'),
+        pikpakPassword: form.getFieldValue('pikpakPassword'),
+      })
+      message.success(`${downloadTool === 'pikpak' ? 'PikPak' : '115'} 登录成功`)
     } catch (e) {
-      message.error(`115 登录失败: ${(e as Error).message}`)
-    }
+      message.error(`网盘登录失败: ${(e as Error).message}`)
+    } finally { setTestingDownload(false) }
   }
 
   const handleExport = async () => {
     try {
-      const resp = await api.exportConfig()
-      const blob = await resp.blob()
+      const blob = await api.exportConfig()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -196,9 +204,7 @@ export default function SettingsPage() {
   const handleImport = async (file: File) => {
     setSaving(true)
     try {
-      const resp = await api.importConfig(file)
-      const json = (await resp.json()) as { code: number; message: string }
-      if (json.code !== 200) throw new Error(json.message)
+      await api.importConfig(file)
       message.success('导入成功，配置已重新加载')
       await queryClient.invalidateQueries()
     } catch (e) {
@@ -223,6 +229,7 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       await api.setConfig({ login: { username: values.username, password: values.password ?? '' } })
+      await queryClient.invalidateQueries({ queryKey: ['config'] })
       message.success('已保存')
     } catch (e) {
       message.error(`保存失败: ${(e as Error).message}`)
@@ -232,6 +239,9 @@ export default function SettingsPage() {
   }
 
   const notificationList = Form.useWatch('notificationConfigList', form) ?? []
+
+  if (isPending) return <Skeleton active />
+  if (error) return <Alert type="error" title="配置加载失败" description={error.message} action={<Button onClick={() => refetch()}>重试</Button>} />
 
   return (
     <Tabs
@@ -328,9 +338,17 @@ export default function SettingsPage() {
                   ]}
                 />
               </Form.Item>
-              <Form.Item label="115 Cookie" name="pan115Cookie">
+              {downloadTool === 'pikpak' ? <>
+                <Form.Item label="PikPak 账号" name="pikpakEmail" extra="使用邮箱或带国家区号的手机号，如 +86138…">
+                  <Input autoComplete="username" placeholder="邮箱或手机号" />
+                </Form.Item>
+                <Form.Item label="PikPak 密码" name="pikpakPassword">
+                  <Input.Password autoComplete="new-password" placeholder="PikPak 账号密码" />
+                </Form.Item>
+              </> : <Form.Item label="115 Cookie" name="pan115Cookie">
                 <Input.TextArea rows={3} placeholder="UID=...; CID=...; SEID=..." />
-              </Form.Item>
+              </Form.Item>}
+              <Alert type="info" showIcon style={{ marginBottom: 16 }} title="切换网盘后，新任务使用所选网盘；历史已完成集数保留，云端文件不会自动迁移。" />
               <Form.Item label="下载重试次数" name="downloadRetry">
                 <InputNumber min={1} max={10} />
               </Form.Item>
@@ -344,7 +362,7 @@ export default function SettingsPage() {
                 <Switch />
               </Form.Item>
               <Space>
-                <Button onClick={handle115Test}>测试 115 登录</Button>
+                <Button onClick={handleDownloadTest} loading={testingDownload}>测试 {downloadTool === 'pikpak' ? 'PikPak' : '115'} 登录</Button>
                 <Button type="primary" onClick={handleSave} loading={saving}>
                   保存
                 </Button>

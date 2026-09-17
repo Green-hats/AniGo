@@ -59,11 +59,11 @@ type CloudFile struct {
 	Name     string
 	Size     int64
 	IsDir    bool
-	ID       string // 提供方特定的目录 id（115 cid）
-	PickCode string // 提供方特定的下载码（115 pc）
+	ID       string // 提供方特定的目录 id（115 cid / PikPak file ID）
+	PickCode string // 提供方特定的下载码（115 pc / PikPak file ID）
 }
 
-// CloudDriver 是统一网盘驱动接口。目前实现 driver_115，后续扩展其他网盘。
+// CloudDriver 是统一网盘驱动接口。实现 115 与 PikPak。
 // 网盘驱动只做"路径/磁力 → 云端文件"的原子操作，不感知订阅。
 // 需要网盘凭据的方法接收 cfg 作为参数，保证始终拿到最新配置。
 type CloudDriver interface {
@@ -107,4 +107,16 @@ type Notifier interface {
 	Type() NotificationTypeEnum
 	// Send 发送一条通知。cfg 是该渠道的配置。
 	Send(ctx context.Context, cfg *NotificationConfig, n *Notification) error
+}
+
+// OfflineTaskTracker 为支持状态查询的驱动提供可选能力。
+type OfflineTaskTracker interface {
+	OfflineTasks(context.Context, *Config) ([]OfflineTaskStatus, error)
+	RetryOfflineTask(context.Context, *Config, string, string, string) error
+}
+type OfflineTaskStatus struct {
+	Hash  string
+	URL   string
+	State string
+	Error string
 }

@@ -27,51 +27,52 @@ type StandbyRss struct {
 
 // Ani 是一个订阅，持久化为 ani.v2.json 的 JSON 数组。
 type Ani struct {
-	Sort                         int          `json:"sort"`
-	ID                           string       `json:"id"`
-	URL                          string       `json:"url"`
-	StandbyRssList               []StandbyRss `json:"standbyRssList"`
-	Title                        string       `json:"title"`
-	JpTitle                      string       `json:"jpTitle"`
-	Offset                       int          `json:"offset"`
-	ReleaseDate                  Date         `json:"releaseDate"`
-	Season                       int          `json:"season"`
-	Cover                        string       `json:"cover"`
-	Image                        string       `json:"image"`
-	Subgroup                     string       `json:"subgroup"`
-	Match                        []string     `json:"match"`
-	Exclude                      []string     `json:"exclude"`
-	GlobalExclude                bool         `json:"globalExclude"`
-	Ova                          bool         `json:"ova"`
-	Pinyin                       string       `json:"pinyin"`
-	PinyinInitials               string       `json:"pinyinInitials"`
-	Enable                       bool         `json:"enable"`
-	CurrentEpisodeNumber         int          `json:"currentEpisodeNumber"`
-	TotalEpisodeNumber           int          `json:"totalEpisodeNumber"`
-	BgmAiredEps                  int          `json:"bgmAiredEps"`
-	DownloadedEps                int          `json:"downloadedEps"`
-	Type                         string       `json:"type"`
-	BgmUrl                       string       `json:"bgmUrl"`
-	CustomDownloadPath           bool         `json:"customDownloadPath"`
-	CustomDownloadPathTemplate   string       `json:"customDownloadPathTemplate"`
-	Score                        float64      `json:"score"`
-	CustomEpisode                bool         `json:"customEpisode"`
-	CustomEpisodeStr             string       `json:"customEpisodeStr"`
-	CustomEpisodeGroupIndex      int          `json:"customEpisodeGroupIndex"`
-	Omit                         bool         `json:"omit"`
-	DownloadNew                  bool         `json:"downloadNew"`
-	NotDownload                  []float64    `json:"notDownload"`
-	Downloaded                   []float64    `json:"downloaded"`
-	DownloadedHash               []string     `json:"downloadedHash"`
-	Procrastinating              bool         `json:"procrastinating"`
-	CustomRenameTemplateEnable   bool         `json:"customRenameTemplateEnable"`
-	CustomRenameTemplate         string       `json:"customRenameTemplate"`
-	CustomPriorityKeywordsEnable bool         `json:"customPriorityKeywordsEnable"`
-	CustomPriorityKeywords       []string     `json:"customPriorityKeywords"`
-	LastDownloadTime             int64        `json:"lastDownloadTime"`
-	Message                      bool         `json:"message"`
-	CustomTagsEnable             bool         `json:"customTagsEnable"`
-	CustomTags                   []string     `json:"customTags"`
+	Sort                         int            `json:"sort"`
+	ID                           string         `json:"id"`
+	URL                          string         `json:"url"`
+	StandbyRssList               []StandbyRss   `json:"standbyRssList"`
+	Title                        string         `json:"title"`
+	JpTitle                      string         `json:"jpTitle"`
+	Offset                       int            `json:"offset"`
+	ReleaseDate                  Date           `json:"releaseDate"`
+	Season                       int            `json:"season"`
+	Cover                        string         `json:"cover"`
+	Image                        string         `json:"image"`
+	Subgroup                     string         `json:"subgroup"`
+	Match                        []string       `json:"match"`
+	Exclude                      []string       `json:"exclude"`
+	GlobalExclude                bool           `json:"globalExclude"`
+	Ova                          bool           `json:"ova"`
+	Pinyin                       string         `json:"pinyin"`
+	PinyinInitials               string         `json:"pinyinInitials"`
+	Enable                       bool           `json:"enable"`
+	CurrentEpisodeNumber         int            `json:"currentEpisodeNumber"`
+	TotalEpisodeNumber           int            `json:"totalEpisodeNumber"`
+	BgmAiredEps                  int            `json:"bgmAiredEps"`
+	DownloadedEps                int            `json:"downloadedEps"`
+	Type                         string         `json:"type"`
+	BgmUrl                       string         `json:"bgmUrl"`
+	CustomDownloadPath           bool           `json:"customDownloadPath"`
+	CustomDownloadPathTemplate   string         `json:"customDownloadPathTemplate"`
+	Score                        float64        `json:"score"`
+	CustomEpisode                bool           `json:"customEpisode"`
+	CustomEpisodeStr             string         `json:"customEpisodeStr"`
+	CustomEpisodeGroupIndex      int            `json:"customEpisodeGroupIndex"`
+	Omit                         bool           `json:"omit"`
+	DownloadNew                  bool           `json:"downloadNew"`
+	NotDownload                  []float64      `json:"notDownload"`
+	Downloaded                   []float64      `json:"downloaded"`
+	DownloadedHash               []string       `json:"downloadedHash"`
+	DownloadTasks                []DownloadTask `json:"downloadTasks"`
+	Procrastinating              bool           `json:"procrastinating"`
+	CustomRenameTemplateEnable   bool           `json:"customRenameTemplateEnable"`
+	CustomRenameTemplate         string         `json:"customRenameTemplate"`
+	CustomPriorityKeywordsEnable bool           `json:"customPriorityKeywordsEnable"`
+	CustomPriorityKeywords       []string       `json:"customPriorityKeywords"`
+	LastDownloadTime             int64          `json:"lastDownloadTime"`
+	Message                      bool           `json:"message"`
+	CustomTagsEnable             bool           `json:"customTagsEnable"`
+	CustomTags                   []string       `json:"customTags"`
 }
 
 // Clone 返回 Ani 的浅拷贝。
@@ -86,6 +87,7 @@ func (a *Ani) Clone() *Ani {
 	c.NotDownload = append([]float64(nil), a.NotDownload...)
 	c.Downloaded = append([]float64(nil), a.Downloaded...)
 	c.DownloadedHash = append([]string(nil), a.DownloadedHash...)
+	c.DownloadTasks = append([]DownloadTask(nil), a.DownloadTasks...)
 	c.CustomPriorityKeywords = append([]string(nil), a.CustomPriorityKeywords...)
 	c.CustomTags = append([]string(nil), a.CustomTags...)
 	return &c
@@ -113,4 +115,18 @@ func DefaultAni() *Ani {
 		Message:                 true,
 		CustomEpisodeGroupIndex: 2,
 	}
+}
+
+// DownloadTask 保存提交与云端完成状态；历史 downloaded 字段仍兼容旧备份。
+type DownloadTask struct {
+	Provider  string  `json:"provider,omitempty"`
+	Hash      string  `json:"hash"`
+	Episode   float64 `json:"episode"`
+	Torrent   string  `json:"torrent"`
+	Path      string  `json:"path"`
+	State     string  `json:"state"` // pending / submitted / completed / failed
+	Attempts  int     `json:"attempts"`
+	UpdatedAt int64   `json:"updatedAt"`
+	RetryAt   int64   `json:"retryAt"`
+	Error     string  `json:"error,omitempty"`
 }

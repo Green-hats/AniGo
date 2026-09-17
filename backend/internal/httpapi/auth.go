@@ -105,12 +105,20 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
+		if path == "/api/file" && (c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead) && s.validPlayTicket(c.Query("ticket"), c.Query("pickcode")) {
+			c.Next()
+			return
+		}
 		if s.cfg.Get().Login.Password == "" {
 			c.Next()
 			return
 		}
 		if token := bearerToken(c); token != "" && s.sessions.valid(token) {
 			c.Next()
+			return
+		}
+		if path == "/api/file" {
+			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 		failCode(c, http.StatusUnauthorized, "未登录或登录已过期")

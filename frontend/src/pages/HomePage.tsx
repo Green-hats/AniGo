@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Card,
   Collapse,
@@ -13,6 +13,7 @@ import {
   Modal,
   Empty,
   Skeleton,
+  Alert,
 } from 'antd'
 import {
   DeleteOutlined,
@@ -35,60 +36,79 @@ const b64u = (s: string) => {
 }
 
 export default function HomePage() {
-  const { data, refetch, isFetching } = useQuery({ queryKey: ['listAni'], queryFn: api.listAni })
+  const qc = useQueryClient()
+  const { data, refetch, isPending, error } = useQuery({ queryKey: ['listAni'], queryFn: api.listAni, refetchInterval: 10_000 })
+  const { data: jobs = [] } = useQuery({ queryKey: ['refreshStatus'], queryFn: api.refreshStatus, refetchInterval: 2000 })
+  const completed = jobs.filter(j => j.state !== 'queued' && j.state !== 'running').map(j => `${j.id}:${j.updatedAt}`).join('|')
+  useEffect(() => { if (completed) void qc.invalidateQueries({ queryKey: ['listAni'] }) }, [completed, qc])
+  const active = (id?: string) => jobs.some(j => (!id || j.id === id) && (j.state === 'queued' || j.state === 'running'))
+  const [refreshAllPending, setRefreshAllPending] = useState(false)
+  const [launching, setLaunching] = useState<string | null>(null)
+  const playRequest = useRef(0)
   const [refreshing, setRefreshing] = useState<string | null>(null)
   const [playAni, setPlayAni] = useState<Ani | null>(null)
   const [playItems, setPlayItems] = useState<PlayItem[] | null>(null)
   const [playLoading, setPlayLoading] = useState(false)
 
   const handleDelete = async (id: string) => {
-    await api.deleteAni([id])
-    message.success('已删除')
-    refetch()
+    try {
+      await api.deleteAni([id])
+      message.success('已删除')
+      await qc.invalidateQueries({ queryKey: ['gardenList'] })
+      await refetch()
+    } catch (e) { message.error((e as Error).message) }
   }
 
   const handleRefresh = async (id: string) => {
     setRefreshing(id)
     try {
       await api.refreshAni(id)
-      message.success('已开始刷新')
-      refetch()
-    } finally {
+      message.success('刷新任务已加入队列')
+      await qc.invalidateQueries({ queryKey: ['refreshStatus'] })
+    } catch (e) { message.error((e as Error).message) } finally {
       setRefreshing(null)
     }
   }
 
   const handleToggle = async (ani: Ani) => {
-    await api.batchEnable([ani.id], !ani.enable)
-    refetch()
+    try { await api.batchEnable([ani.id], !ani.enable); await refetch() }
+    catch (e) { message.error((e as Error).message) }
   }
 
   const handleRefreshAll = async () => {
-    await api.refreshAll()
-    message.success('已开始刷新全部')
-    refetch()
+    setRefreshAllPending(true)
+    try {
+      await api.refreshAll()
+      message.success('刷新任务已加入队列')
+      await qc.invalidateQueries({ queryKey: ['refreshStatus'] })
+    } catch (e) { message.error((e as Error).message) }
+    finally { setRefreshAllPending(false) }
   }
 
   const handlePlay = async (ani: Ani) => {
+    const request = ++playRequest.current
     setPlayAni(ani)
     setPlayItems(null)
     setPlayLoading(true)
     try {
       const items = await api.playList(ani.id)
-      setPlayItems(items)
+      if (request === playRequest.current) setPlayItems(items)
     } catch (e) {
-      message.error((e as Error).message)
-      setPlayAni(null)
+      if (request === playRequest.current) { message.error((e as Error).message); setPlayAni(null) }
     } finally {
-      setPlayLoading(false)
+      if (request === playRequest.current) setPlayLoading(false)
     }
   }
 
-const buildMpvUrl = (item: PlayItem) => {
-    // 走本地代理转发（后端用 115 UA 拉流），mpv 只访问本地服务，规避 115 CDN 的 UA 绑定
-    // mpv-handler 协议要求：play/<b64url>/?参数  —— b64url 后必须有 "/"，参数才生效
-    const proxyUrl = `${window.location.origin}/api/file?pickcode=${encodeURIComponent(item.pickCode)}`
-    return `mpv-handler://play/${b64u(proxyUrl)}/?v_title=${b64u(item.filename)}`
+  const handleLaunch = async (item: PlayItem) => {
+    if (!playAni) return
+    setLaunching(item.pickCode)
+    try {
+      const ticket = await api.playTicket(playAni.id, item.pickCode)
+      const proxyUrl = new URL(ticket.url, window.location.origin).href
+      window.location.assign(`mpv-handler://play/${b64u(proxyUrl)}/?v_title=${b64u(item.filename)}`)
+    } catch (e) { message.error((e as Error).message) }
+    finally { setLaunching(null) }
   }
 
   const sortedPlayItems = playItems ? [...playItems].sort((a, b) => a.episode - b.episode || a.filename.localeCompare(b.filename)) : []
@@ -99,11 +119,14 @@ const buildMpvUrl = (item: PlayItem) => {
         <Typography.Title level={4} style={{ margin: 0 }}>
           我的订阅 ({data?.total ?? 0})
         </Typography.Title>
-        <Button icon={<SyncOutlined />} onClick={handleRefreshAll} loading={isFetching}>
+        <Button icon={<SyncOutlined />} onClick={handleRefreshAll} loading={refreshAllPending || active()}>
           刷新全部
         </Button>
       </div>
 
+      {error && <Alert type="error" title="订阅加载失败" description={error.message} action={<Button onClick={() => refetch()}>重试</Button>} />}
+      {isPending && <Skeleton active />}
+      {data?.total === 0 && <Empty description="还没有订阅，去番剧源添加吧" />}
       {!data ? null : (
       <Collapse
         defaultActiveKey={data.weekList.map((_, i) => String(i))}
@@ -111,7 +134,7 @@ const buildMpvUrl = (item: PlayItem) => {
           key: String(i),
           label: `${week.weekLabel} (${week.items.length})`,
           children: (
-            <Space direction="vertical" style={{ width: '100%' }} size="small">
+            <Space orientation="vertical" style={{ width: '100%' }} size="small">
               {week.items.length === 0 && <Text type="secondary">暂无订阅</Text>}
               {week.items.map((ani) => (
                 <Card key={ani.id} size="small" styles={{ body: { padding: 12 } }}>
@@ -131,9 +154,12 @@ const buildMpvUrl = (item: PlayItem) => {
                         {ani.score > 0 && <Tag color="gold">{ani.score.toFixed(1)}</Tag>}
                       </div>
                       <Text type="secondary" style={{ fontSize: 12 }}>
-                        已下载 {ani.downloadedEps || ani.currentEpisodeNumber} / 更新 {ani.bgmAiredEps || ani.totalEpisodeNumber || '?'} / 共 {ani.totalEpisodeNumber || '?'} 集
+                        已完成 {ani.downloadedEps ?? 0} / 更新 {ani.bgmAiredEps || ani.totalEpisodeNumber || '?'} / 共 {ani.totalEpisodeNumber || '?'} 集
                         {ani.subgroup && ` · ${ani.subgroup}`}
                       </Text>
+                      {ani.downloadTasks?.some(t => t.state === 'submitted' || t.state === 'pending') && <Tag color="processing">云端处理中</Tag>}
+                      {ani.downloadTasks?.some(t => t.state === 'failed') && <Tooltip title={ani.downloadTasks.filter(t => t.state === 'failed').map(t => `第 ${t.episode} 集：${t.error}`).join('；')}><Tag color="error">下载失败</Tag></Tooltip>}
+                      {jobs.find(j => j.id === ani.id)?.state === 'failed' && <Text type="danger" style={{ display: 'block' }}>{jobs.find(j => j.id === ani.id)?.error}</Text>}
                     </div>
                     <Space>
                       <Tooltip title="播放">
@@ -145,7 +171,7 @@ const buildMpvUrl = (item: PlayItem) => {
                         </Button>
                       </Tooltip>
                       <Tooltip title="刷新">
-                        <Button size="small" icon={<SyncOutlined />} loading={refreshing === ani.id} onClick={() => handleRefresh(ani.id)} />
+                        <Button size="small" icon={<SyncOutlined />} disabled={!ani.enable} loading={refreshing === ani.id || active(ani.id)} onClick={() => handleRefresh(ani.id)} />
                       </Tooltip>
                       <Popconfirm title="删除该订阅？" onConfirm={() => handleDelete(ani.id)}>
                         <Button size="small" danger icon={<DeleteOutlined />} />
@@ -161,7 +187,7 @@ const buildMpvUrl = (item: PlayItem) => {
       )}
       <Modal
         open={!!playAni}
-        onCancel={() => setPlayAni(null)}
+        onCancel={() => { ++playRequest.current; setPlayAni(null) }}
         footer={null}
         width={620}
         title={
@@ -257,15 +283,9 @@ const buildMpvUrl = (item: PlayItem) => {
                     </Text>
                   )}
                 </div>
-                <a
-                  href={buildMpvUrl(item)}
-                  style={{ flexShrink: 0 }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Button type="primary" size="small" icon={<PlaySquareOutlined />}>
-                    用 mpv 播放
-                  </Button>
-                </a>
+                <Button type="primary" size="small" icon={<PlaySquareOutlined />} loading={launching === item.pickCode} onClick={() => handleLaunch(item)}>
+                  用 mpv 播放
+                </Button>
               </div>
             ))}
           </div>

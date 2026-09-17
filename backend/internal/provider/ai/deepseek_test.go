@@ -43,18 +43,17 @@ func TestParseJSON(t *testing.T) {
 		t.Fatalf("bad fence parse: %+v", out2[0])
 	}
 
-	// 3. AI 返回长度不足 → 补全 rawTitle
+	// 3. 缺失结果必须拒绝，避免错配集号或缓存不完整结果
 	d.completeFn = func(ctx context.Context, system, user string) (string, error) {
 		return `[]`, nil
 	}
-	out3, _ := d.Parse(context.Background(), ani, []string{"t1", "t2"})
-	if len(out3) != 2 || out3[0].RawTitle != "t1" || out3[1].RawTitle != "t2" {
-		t.Fatalf("padding fail: %+v", out3)
+	if _, err := d.Parse(context.Background(), ani, []string{"t1", "t2"}); err == nil {
+		t.Fatal("缺失结果应报错")
 	}
 
 	// 4. 解析选版信号字段（内封/内嵌、编码、压制源、色深、字幕语言）
 	d.completeFn = func(ctx context.Context, system, user string) (string, error) {
-		return `[{"rawTitle":"x","episode":4,"resolution":"1080P","subgroup":"北宇治字幕组","title":"与你相恋到生命尽头","isSpecial":false,"subtitleEmbed":"内封","videoCodec":"HEVC","source":"WebRip","colorDepth":"10bit","subtitleLang":"简繁日"}]`, nil
+		return `[{"episode":4,"resolution":"1080P","subgroup":"北宇治字幕组","title":"与你相恋到生命尽头","isSpecial":false,"subtitleEmbed":"内封","videoCodec":"HEVC","source":"WebRip","colorDepth":"10bit","subtitleLang":"简繁日"}]`, nil
 	}
 	out4, err := d.Parse(context.Background(), ani, []string{"[北宇治字幕组] 与你相恋到生命尽头 [04][WebRip][HEVC_AAC][简繁日内封]"})
 	if err != nil {

@@ -32,12 +32,12 @@ const ua115 = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHT
 
 // 常见请求路径（便于复用与测试）。
 const (
-	apiFiles       = "https://webapi.115.com/files"
-	apiFileAdd     = "https://webapi.115.com/files/add"
-	apiDelete      = "https://webapi.115.com/rb/delete"
-	apiLixianAdd   = "https://115.com/web/lixian/?ct=lixian&ac=add_task_url"
-	apiLixianList  = "https://115.com/web/lixian/?ct=lixian&ac=task_lists"
-	apiFileURL     = "https://proapi.115.com/app/chrome/down"
+	apiFiles      = "https://webapi.115.com/files"
+	apiFileAdd    = "https://webapi.115.com/files/add"
+	apiDelete     = "https://webapi.115.com/rb/delete"
+	apiLixianAdd  = "https://115.com/web/lixian/?ct=lixian&ac=add_task_url"
+	apiLixianList = "https://115.com/web/lixian/?ct=lixian&ac=task_lists"
+	apiFileURL    = "https://proapi.115.com/app/chrome/down"
 )
 
 // New 创建 115 驱动。
@@ -97,6 +97,9 @@ func (p *Pan115) request(ctx context.Context, cfg *domain.Config, method, rawURL
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("115 HTTP %s", resp.Status)
+	}
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -156,12 +159,12 @@ func (p *Pan115) Login(ctx context.Context, test bool, cfg *domain.Config) (bool
 type filesResponse struct {
 	State bool `json:"state"`
 	Data  []struct {
-		CID  string `json:"cid"`
-		FID  string `json:"fid"`
-		FC   int    `json:"fc"`
-		N    string `json:"n"`
-		S    int64  `json:"s"`
-		PC   string `json:"pc"`
+		CID string `json:"cid"`
+		FID string `json:"fid"`
+		FC  int    `json:"fc"`
+		N   string `json:"n"`
+		S   int64  `json:"s"`
+		PC  string `json:"pc"`
 	} `json:"data"`
 }
 
@@ -334,7 +337,13 @@ func (p *Pan115) FileURLByPickCode(ctx context.Context, cfg *domain.Config, pick
 
 // ListDir 列出云端目录的文件。
 func (p *Pan115) ListDir(ctx context.Context, cfg *domain.Config, path string) ([]domain.CloudFile, error) {
-	dirID, _, _ := p.walkPath(ctx, cfg, path)
+	dirID, missing, err := p.walkPath(ctx, cfg, path)
+	if err != nil {
+		return nil, err
+	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("目录不存在: %s", path)
+	}
 	if dirID == "0" {
 		return nil, nil
 	}

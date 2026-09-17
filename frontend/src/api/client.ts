@@ -1,4 +1,4 @@
-import type { Result } from '../types'
+import type { Config, Result } from '../types'
 
 // 后端统一返回 {code, message, data, t}
 const BASE = ''
@@ -29,13 +29,15 @@ function handleUnauthorized() {
   window.dispatchEvent(new Event('anigo:unauthorized'))
 }
 
-async function request<T>(method: string, url: string, body?: unknown, timeoutMs = DEFAULT_TIMEOUT): Promise<T> {
+async function request<T>(method: string, url: string, body?: unknown, timeoutMs = DEFAULT_TIMEOUT, responseType: 'json' | 'blob' = 'json'): Promise<T> {
   const opts: RequestInit = { method, headers: {} }
   const token = getToken()
   if (token) {
     opts.headers = { Authorization: `Bearer ${token}` }
   }
-  if (body !== undefined) {
+  if (body instanceof FormData) {
+    opts.body = body
+  } else if (body !== undefined) {
     opts.headers = { ...opts.headers, 'Content-Type': 'application/json' }
     opts.body = JSON.stringify(body)
   }
@@ -44,13 +46,23 @@ async function request<T>(method: string, url: string, body?: unknown, timeoutMs
   opts.signal = ctrl.signal
   try {
     const resp = await fetch(BASE + url, opts)
-    const json = (await resp.json()) as Result<T>
+    if (resp.status === 401) {
+      handleUnauthorized()
+      throw new Error('未登录或登录已过期')
+    }
+    if (responseType === 'blob' && resp.ok && resp.headers.get('Content-Type')?.includes('application/zip')) {
+      return await resp.blob() as T
+    }
+    let json: Result<T>
+    try { json = (await resp.json()) as Result<T> }
+    catch { throw new Error(`服务器响应异常（HTTP ${resp.status}）`) }
     if (json.code === 401) {
       handleUnauthorized()
     }
-    if (json.code !== 200) {
-      throw new Error(json.message)
+    if (json.code !== 200 || resp.ok === false) {
+      throw new Error(json.message || `请求失败（HTTP ${resp.status}）`)
     }
+    if (responseType === 'blob') throw new Error('服务器未返回有效备份文件')
     return json.data
   } catch (e) {
     if ((e as Error).name === 'AbortError') {
@@ -75,16 +87,11 @@ export const api = {
   getConfig: () => request<import('../types').Config>('POST', '/api/config'),
   setConfig: (cfg: Partial<import('../types').Config>) =>
     request<null>('POST', '/api/setConfig', cfg),
-  exportConfig: () =>
-    fetch(BASE + '/api/exportConfig', { headers: { Authorization: `Bearer ${getToken()}` } }),
+  exportConfig: () => request<Blob>('GET', '/api/exportConfig', undefined, 120_000, 'blob'),
   importConfig: (file: File) => {
     const form = new FormData()
     form.append('file', file)
-    return fetch(BASE + '/api/importConfig', {
-      method: 'POST',
-      body: form,
-      headers: { Authorization: `Bearer ${getToken()}` },
-    })
+    return request<null>('POST', '/api/importConfig', form, 120_000)
   },
 
   // 订阅
@@ -101,16 +108,20 @@ export const api = {
   downloadPath: (ani: Partial<import('../types').Ani>) =>
     request<{ downloadPath: string }>('POST', '/api/downloadPath', ani),
   refreshAll: () => request<null>('POST', '/api/refreshAll'),
+  refreshStatus: () => request<import('../types').RefreshJob[]>('POST', '/api/refreshStatus'),
   refreshAni: (id: string) => request<null>('POST', '/api/refreshAni', { id }),
   rssToAni: (dto: import('../types').RssToAniDTO) =>
     request<import('../types').Ani>('POST', '/api/rssToAni', dto),
 
   // 下载
   downloadStatus: () => request<import('../types').LoginStatus>('POST', '/api/downloadStatus'),
-  downloadLoginTest: (cookie?: string) =>
-    request<null>('POST', '/api/downloadLoginTest', cookie ? { pan115Cookie: cookie } : {}),
+  downloadLoginTest: (config: Partial<Pick<Config, 'downloadToolType' | 'pan115Cookie' | 'pikpakEmail' | 'pikpakPassword'>> = {}) =>
+    request<null>('POST', '/api/downloadLoginTest', config),
   playList: (id: string) =>
     request<import('../types').PlayItem[]>('POST', '/api/playList', { id }),
+
+  playTicket: (id: string, pickCode: string) =>
+    request<{ url: string; expiresAt: number }>('POST', '/api/playTicket', { id, pickCode }),
 
   // AI
   aiPing: () => request<{ reply: string }>('POST', '/api/aiPing'),
@@ -121,7 +132,7 @@ export const api = {
   gardenList: () =>
     request<import('../types').GardenWeek[]>('POST', '/api/gardenList'),
   gardenGroup: (subject: string) =>
-    request<import('../types').GardenGroup[]>('POST', `/api/gardenGroup?subject=${subject}`),
+    request<import('../types').GardenGroup[]>('POST', `/api/gardenGroup?subject=${encodeURIComponent(subject)}`),
 
   // 通知
   testNotification: (nc: import('../types').NotificationConfig) =>

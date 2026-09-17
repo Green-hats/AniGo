@@ -44,9 +44,11 @@ export default function LogsPage() {
   const filtered = logs?.filter((l) => level === '全部' || l.level === level) ?? []
 
   const handleClear = async () => {
-    await api.clearLogs()
-    await qc.invalidateQueries({ queryKey: ['logs'] })
-    antMessage.success('已清空日志')
+    try {
+      await api.clearLogs()
+      await qc.invalidateQueries({ queryKey: ['logs'] })
+      antMessage.success('已清空日志')
+    } catch (e) { antMessage.error((e as Error).message) }
   }
 
   const columns: ColumnsType<LogEntry> = [

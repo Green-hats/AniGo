@@ -57,6 +57,8 @@ export interface Config {
   downloadToolType: string
   downloadRetry: number
   pan115Cookie: string
+  pikpakEmail: string
+  pikpakPassword: string
   downloadPathTemplate: string
   ovaDownloadPathTemplate: string
   delayedDownload: number
@@ -128,7 +130,25 @@ export interface Config {
   aiSubtitleSC: boolean
 }
 
+export interface DownloadTask {
+  provider?: string
+  hash: string
+  episode: number
+  state: 'pending' | 'submitted' | 'completed' | 'failed'
+  attempts: number
+  retryAt: number
+  error?: string
+}
+
+export interface RefreshJob {
+ id: string
+ state: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+ error?: string
+ updatedAt: number
+}
+
 export interface Ani {
+  downloadTasks?: DownloadTask[]
   id: string
   title: string
   jpTitle: string

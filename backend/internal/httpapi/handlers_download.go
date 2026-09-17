@@ -1,29 +1,52 @@
 package httpapi
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
+	"github.com/greenhats/anigo/internal/cloud"
+	"strings"
 
 	"github.com/greenhats/anigo/internal/domain"
 )
 
 // handleDownloadLoginTest 测试网盘登录。
 func (s *Server) handleDownloadLoginTest(c *gin.Context) {
-	var body domain.Config
-	if err := c.ShouldBindJSON(&body); err == nil && body.Pan115Cookie != "" {
-		// 允许用请求体里的 Cookie 临时测试
-		cur := *s.cfg.Get()
-		cur.Pan115Cookie = body.Pan115Cookie
-		if ok, _ := s.download.Driver().Login(c.Request.Context(), true, &cur); ok {
-			okMsg(c, "登录成功")
-			return
-		}
-		fail(c, "登录失败")
+	var body struct {
+		Tool     *string `json:"downloadToolType"`
+		Cookie   *string `json:"pan115Cookie"`
+		Email    *string `json:"pikpakEmail"`
+		Password *string `json:"pikpakPassword"`
+	}
+	if !readJSONOrFail(c, &body) {
 		return
 	}
-	if !s.download.Login(true) {
-		fail(c, "登录失败")
+	cfg := s.cfg.Get()
+	if body.Tool != nil {
+		cfg.DownloadToolType = strings.ToLower(strings.TrimSpace(*body.Tool))
+	}
+	if body.Cookie != nil {
+		cfg.Pan115Cookie = *body.Cookie
+	}
+	if body.Email != nil {
+		cfg.PikpakEmail = *body.Email
+	}
+	if body.Password != nil {
+		cfg.PikpakPassword = *body.Password
+	}
+	switch cfg.DownloadToolType {
+	case "", "115", "pan115", "pikpak":
+	default:
+		fail(c, "不支持的网盘类型")
+		return
+	}
+	// A separate driver tests unsaved credentials without replacing the live session.
+	driver := cloud.NewRegistry().Get(cfg)
+	success, err := driver.Login(c.Request.Context(), true, cfg)
+	if err != nil {
+		fail(c, err.Error())
+		return
+	}
+	if !success {
+		fail(c, driver.GetLoginStatus().Message)
 		return
 	}
 	okMsg(c, "登录成功")
@@ -34,7 +57,7 @@ func (s *Server) handleDownloadStatus(c *gin.Context) {
 	ok(c, s.download.DownloadLoginStatus())
 }
 
-// handlePlayList 返回订阅在 115 云端目录下的可播放文件列表（用于前端播放弹窗）。
+// handlePlayList 返回订阅在所选网盘目录下的可播放文件列表（用于前端播放弹窗）。
 func (s *Server) handlePlayList(c *gin.Context) {
 	var body domain.IdDTO
 	if !readJSONOrFail(c, &body) {
@@ -57,7 +80,10 @@ func (s *Server) handlePlayList(c *gin.Context) {
 // 手动刷新是"发起即返回"的用户操作，须用与请求无关的 ctx，
 // 否则 handler 返回后请求 ctx 被取消，后台刷新会立即中止。
 func (s *Server) handleRefreshAll(c *gin.Context) {
-	go s.download.SyncDownload(context.Background(), s.cfg.AniList())
+	if err := s.download.EnqueueAll(); err != nil {
+		fail(c, err.Error())
+		return
+	}
 	okMsg(c, "已开始刷新RSS")
 }
 
@@ -72,22 +98,29 @@ func (s *Server) handleRefreshAni(c *gin.Context) {
 		fail(c, "订阅不存在")
 		return
 	}
-	go s.download.DownloadAni(context.Background(), ani)
+	if !ani.Enable {
+		fail(c, "订阅已停用")
+		return
+	}
+	if err := s.download.EnqueueRefresh(ani.ID); err != nil {
+		fail(c, err.Error())
+		return
+	}
 	okMsg(c, "已开始刷新RSS")
 }
 
 // handleDeleteTorrent 删除云端任务/目录。
 func (s *Server) handleDeleteTorrent(c *gin.Context) {
 	var body struct {
-		SavePath string `json:"savePath"`
-		DeleteFiles bool `json:"deleteFiles"`
+		SavePath    string `json:"savePath"`
+		DeleteFiles bool   `json:"deleteFiles"`
 	}
 	if !readJSONOrFail(c, &body) {
 		return
 	}
 	if body.DeleteFiles && body.SavePath != "" {
 		cfg := s.cfg.Get()
-		if err := s.download.Driver().DeleteDir(c.Request.Context(), cfg, body.SavePath); err != nil {
+		if err := s.download.DriverForConfig(cfg).DeleteDir(c.Request.Context(), cfg, body.SavePath); err != nil {
 			fail(c, err.Error())
 			return
 		}

@@ -2,9 +2,12 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 
@@ -129,8 +132,21 @@ func (s *JSONStore) writeJSONLocked(path string, v interface{}) error {
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+	f, err := os.CreateTemp(filepath.Dir(path), ".anigo-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer os.Remove(tmp)
+	if _, err := f.Write(b); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
 		return err
 	}
 	return os.Rename(tmp, path)
@@ -201,4 +217,82 @@ func fillAniDefaults(a *domain.Ani) {
 	if a.CustomTags == nil {
 		a.CustomTags = []string{}
 	}
+}
+
+// RestoreBackup 暂存完整备份，提交失败时反向还原已替换的文件/目录。
+// 与普通保存共用同一把锁，避免导入和保存交错。
+func (s *JSONStore) RestoreBackup(files map[string][]byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	stage, err := os.MkdirTemp(s.dir, ".restore-")
+	if err != nil {
+		return err
+	}
+	keepStage := false
+	defer func() {
+		if !keepStage {
+			_ = os.RemoveAll(stage)
+		}
+	}()
+	roots := map[string]bool{}
+	for name, body := range files {
+		if !filepath.IsLocal(name) {
+			return fmt.Errorf("非法恢复路径")
+		}
+		roots[strings.Split(filepath.ToSlash(name), "/")[0]] = true
+		path := filepath.Join(stage, "new", name)
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			return err
+		}
+		if err := os.WriteFile(path, body, 0600); err != nil {
+			return err
+		}
+	}
+	names := make([]string, 0, len(roots))
+	for name := range roots {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	if err := os.MkdirAll(filepath.Join(stage, "old"), 0700); err != nil {
+		return err
+	}
+	type replaced struct {
+		name    string
+		existed bool
+	}
+	var committed []replaced
+	rollback := func(cause error) error {
+		var rollbackErr error
+		for i := len(committed) - 1; i >= 0; i-- {
+			r := committed[i]
+			dst := filepath.Join(s.dir, r.name)
+			rollbackErr = errors.Join(rollbackErr, os.RemoveAll(dst))
+			if r.existed {
+				rollbackErr = errors.Join(rollbackErr, os.Rename(filepath.Join(stage, "old", r.name), dst))
+			}
+		}
+		if rollbackErr != nil {
+			keepStage = true
+			return errors.Join(cause, fmt.Errorf("恢复回滚失败，原文件保留于 %s: %w", stage, rollbackErr))
+		}
+		return cause
+	}
+	for _, name := range names {
+		dst := filepath.Join(s.dir, name)
+		_, statErr := os.Lstat(dst)
+		existed := statErr == nil
+		if statErr != nil && !os.IsNotExist(statErr) {
+			return rollback(statErr)
+		}
+		if existed {
+			if err := os.Rename(dst, filepath.Join(stage, "old", name)); err != nil {
+				return rollback(err)
+			}
+		}
+		committed = append(committed, replaced{name, existed})
+		if err := os.Rename(filepath.Join(stage, "new", name), dst); err != nil {
+			return rollback(err)
+		}
+	}
+	return nil
 }
