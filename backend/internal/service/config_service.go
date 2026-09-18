@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -35,6 +36,11 @@ func NewConfigService(store domain.ConfigStore, cache domain.Cache) (*ConfigServ
 	anis, err := store.LoadAnis()
 	if err != nil {
 		return nil, err
+	}
+	if bindLegacyTasks(anis, cfg) {
+		if err := store.SaveAnis(anis); err != nil {
+			return nil, err
+		}
 	}
 	return &ConfigService{
 		store:  store,
@@ -80,6 +86,9 @@ func (s *ConfigService) SetConfigRaw(raw []byte) error {
 	}
 	if err := mergeConfigInto(cur, raw); err != nil {
 		return err
+	}
+	if cur.RefreshTimeout < 0 || cur.RefreshTimeout > 1440 || cur.DownloadTimeout < 0 || cur.DownloadTimeout > 10080 {
+		return fmt.Errorf("超时设置超出范围")
 	}
 	if err := s.store.SaveConfig(cur); err != nil {
 		return err
@@ -143,6 +152,10 @@ func (s *ConfigService) UpdateAniList(update func(*[]*domain.Ani) error) error {
 	if err := update(&list); err != nil {
 		return err
 	}
+	bindLegacyTasks(list, s.cfg)
+	if reflect.DeepEqual(list, s.aniLst) {
+		return nil
+	}
 	if err := s.store.SaveAnis(list); err != nil {
 		return err
 	}
@@ -153,14 +166,30 @@ func (s *ConfigService) UpdateAniList(update func(*[]*domain.Ani) error) error {
 var ErrAniNotFound = fmt.Errorf("订阅不存在")
 
 func (s *ConfigService) UpdateAni(id string, update func(*domain.Ani) error) error {
-	return s.UpdateAniList(func(list *[]*domain.Ani) error {
-		for _, ani := range *list {
-			if ani != nil && ani.ID == id {
-				return update(ani)
-			}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, ani := range s.aniLst {
+		if ani == nil || ani.ID != id {
+			continue
 		}
-		return ErrAniNotFound
-	})
+		next := ani.Clone()
+		if err := update(next); err != nil {
+			return err
+		}
+		bindLegacyTasks([]*domain.Ani{next}, s.cfg)
+		if reflect.DeepEqual(ani, next) {
+			return nil
+		}
+		list := append([]*domain.Ani(nil), s.aniLst...)
+		list[i] = next
+		if err := s.store.SaveAnis(list); err != nil {
+			return err
+		}
+		list[i] = next.Clone()
+		s.aniLst = list
+		return nil
+	}
+	return ErrAniNotFound
 }
 
 // ClearCache 清空内存 TTL 缓存。
@@ -300,6 +329,9 @@ func (s *ConfigService) ImportConfig(zipPath string) error {
 	if err := json.Unmarshal(cfgBytes, cfg); err != nil {
 		return fmt.Errorf("配置无效: %w", err)
 	}
+	if cfg.RefreshTimeout < 0 || cfg.RefreshTimeout > 1440 || cfg.DownloadTimeout < 0 || cfg.DownloadTimeout > 10080 {
+		return fmt.Errorf("备份中的超时设置超出范围")
+	}
 	if err := json.Unmarshal(aniBytes, &list); err != nil {
 		return fmt.Errorf("订阅无效: %w", err)
 	}
@@ -320,7 +352,7 @@ func (s *ConfigService) ImportConfig(zipPath string) error {
 				return fmt.Errorf("下载记录无效")
 			}
 			switch task.State {
-			case "pending", "submitted", "completed", "failed":
+			case "pending", "submitted", "completed", "failed", "exhausted", "unknown", "abandoned":
 			default:
 				return fmt.Errorf("下载状态无效")
 			}
@@ -343,6 +375,7 @@ func (s *ConfigService) ImportConfig(zipPath string) error {
 	if err != nil {
 		return err
 	}
+	bindLegacyTasks(list, cfg)
 	files["ani.v2.json"], err = json.MarshalIndent(list, "", "  ")
 	if err != nil {
 		return err

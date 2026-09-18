@@ -119,14 +119,17 @@ func DefaultAni() *Ani {
 
 // DownloadTask 保存提交与云端完成状态；历史 downloaded 字段仍兼容旧备份。
 type DownloadTask struct {
-	Provider  string  `json:"provider,omitempty"`
-	Hash      string  `json:"hash"`
-	Episode   float64 `json:"episode"`
-	Torrent   string  `json:"torrent"`
-	Path      string  `json:"path"`
-	State     string  `json:"state"` // pending / submitted / completed / failed
-	Attempts  int     `json:"attempts"`
-	UpdatedAt int64   `json:"updatedAt"`
-	RetryAt   int64   `json:"retryAt"`
-	Error     string  `json:"error,omitempty"`
+	AccountID   string  `json:"accountId,omitempty"`
+	RemoteID    string  `json:"remoteId,omitempty"`
+	SubmittedAt int64   `json:"submittedAt,omitempty"`
+	Provider    string  `json:"provider,omitempty"`
+	Hash        string  `json:"hash"`
+	Episode     float64 `json:"episode"`
+	Torrent     string  `json:"torrent"`
+	Path        string  `json:"path"`
+	State       string  `json:"state"` // pending / submitted / completed / failed / exhausted / unknown / abandoned
+	Attempts    int     `json:"attempts"`
+	UpdatedAt   int64   `json:"updatedAt"`
+	RetryAt     int64   `json:"retryAt"`
+	Error       string  `json:"error,omitempty"`
 }

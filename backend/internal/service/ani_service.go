@@ -51,7 +51,7 @@ func (s *AniService) ListAni() *domain.ListAni {
 		}
 		visibleTasks := []domain.DownloadTask{}
 		for _, task := range a.DownloadTasks {
-			if taskProvider(task.Provider) == taskProvider(cfg.DownloadToolType) {
+			if taskBelongs(task, cfg) {
 				visibleTasks = append(visibleTasks, task)
 			}
 		}

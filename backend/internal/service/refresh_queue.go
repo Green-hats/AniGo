@@ -20,6 +20,7 @@ type RefreshQueue struct {
 	mu       sync.Mutex
 	jobs     map[string]RefreshJob
 	pending  []string
+	waiting  []string
 	capacity int
 	wake     chan struct{}
 	done     chan struct{}
@@ -29,7 +30,7 @@ type RefreshQueue struct {
 }
 
 func NewRefreshQueue(capacity int, run func(context.Context, string) error) *RefreshQueue {
-	return &RefreshQueue{jobs: map[string]RefreshJob{}, capacity: capacity, wake: make(chan struct{}, 1), run: run}
+	return &RefreshQueue{jobs: map[string]RefreshJob{}, capacity: max(1, capacity), wake: make(chan struct{}, 1), run: run}
 }
 
 func (q *RefreshQueue) Start(parent context.Context) {
@@ -58,7 +59,11 @@ func (q *RefreshQueue) Stop() {
 	q.mu.Unlock()
 }
 
-func (q *RefreshQueue) Enqueue(ids ...string) error {
+func (q *RefreshQueue) Enqueue(ids ...string) error { return q.enqueue(false, ids...) }
+
+func (q *RefreshQueue) EnqueueBatch(ids ...string) error { return q.enqueue(true, ids...) }
+
+func (q *RefreshQueue) enqueue(batch bool, ids ...string) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.cancel == nil || q.ctx.Err() != nil {
@@ -74,19 +79,20 @@ func (q *RefreshQueue) Enqueue(ids ...string) error {
 	}
 	for _, id := range ids {
 		job := q.jobs[id]
-		if id == "" || seen[id] || job.State == "queued" || job.State == "running" {
+		if id == "" || seen[id] || job.State == "queued" || job.State == "running" || job.State == "waiting" {
 			continue
 		}
 		seen[id] = true
 		fresh = append(fresh, id)
 	}
-	if active+len(fresh) > q.capacity {
+	if !batch && active+len(fresh) > q.capacity {
 		return fmt.Errorf("刷新队列已满，请稍后重试")
 	}
 	for _, id := range fresh {
-		q.jobs[id] = RefreshJob{ID: id, State: "queued", UpdatedAt: time.Now().UnixMilli()}
-		q.pending = append(q.pending, id)
+		q.jobs[id] = RefreshJob{ID: id, State: "waiting", UpdatedAt: time.Now().UnixMilli()}
+		q.waiting = append(q.waiting, id)
 	}
+	q.fillLocked()
 	q.trimLocked()
 	select {
 	case q.wake <- struct{}{}:
@@ -106,11 +112,29 @@ func (q *RefreshQueue) Snapshot() []RefreshJob {
 	return jobs
 }
 
+func (q *RefreshQueue) fillLocked() {
+	active := 0
+	for _, job := range q.jobs {
+		if job.State == "running" || job.State == "queued" {
+			active++
+		}
+	}
+	for active < q.capacity && len(q.waiting) > 0 {
+		id := q.waiting[0]
+		q.waiting = q.waiting[1:]
+		job := q.jobs[id]
+		job.State = "queued"
+		q.jobs[id] = job
+		q.pending = append(q.pending, id)
+		active++
+	}
+}
+
 func (q *RefreshQueue) trimLocked() {
 	for len(q.jobs) > q.capacity*2 {
 		oldest := ""
 		for id, job := range q.jobs {
-			if job.State == "queued" || job.State == "running" {
+			if job.State == "queued" || job.State == "running" || job.State == "waiting" {
 				continue
 			}
 			if oldest == "" || job.UpdatedAt < q.jobs[oldest].UpdatedAt {
@@ -129,12 +153,12 @@ func (q *RefreshQueue) loop(ctx context.Context, done chan struct{}) {
 	defer func() {
 		q.mu.Lock()
 		for id, job := range q.jobs {
-			if job.State == "queued" || job.State == "running" {
+			if job.State == "queued" || job.State == "running" || job.State == "waiting" {
 				job.State, job.Error, job.UpdatedAt = "cancelled", "任务已取消", time.Now().UnixMilli()
 				q.jobs[id] = job
 			}
 		}
-		q.pending = nil
+		q.pending, q.waiting = nil, nil
 		q.mu.Unlock()
 	}()
 	for {
@@ -165,6 +189,8 @@ func (q *RefreshQueue) loop(ctx context.Context, done chan struct{}) {
 		}
 		q.mu.Lock()
 		q.jobs[id] = job
+		q.fillLocked()
+		q.trimLocked()
 		q.mu.Unlock()
 	}
 }
@@ -189,5 +215,5 @@ func (s *DownloadService) EnqueueAll() error {
 			ids = append(ids, ani.ID)
 		}
 	}
-	return s.queue.Enqueue(ids...)
+	return s.queue.EnqueueBatch(ids...)
 }

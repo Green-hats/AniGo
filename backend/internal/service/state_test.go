@@ -327,8 +327,8 @@ func TestFailedTaskBackoffAndRetryLimit(t *testing.T) {
 	if err := d.DownloadAni(context.Background(), ani); err != nil {
 		t.Fatal(err)
 	}
-	if driver.adds != 1 || cfg.AniList()[0].DownloadedEps != 0 {
-		t.Fatal("retry limit or completion count incorrect")
+	if driver.adds != 2 || cfg.AniList()[0].DownloadedEps != 0 || cfg.AniList()[0].DownloadTasks[0].State != "exhausted" || cfg.AniList()[0].DownloadTasks[1].Hash != "bbbb" {
+		t.Fatal("exhausted resource did not switch to alternative")
 	}
 }
 

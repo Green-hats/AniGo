@@ -114,7 +114,14 @@ type OfflineTaskTracker interface {
 	OfflineTasks(context.Context, *Config) ([]OfflineTaskStatus, error)
 	RetryOfflineTask(context.Context, *Config, string, string, string) error
 }
+
+// OfflineTaskSubmitter returns a stable upstream task ID when supported.
+type OfflineTaskSubmitter interface {
+	SubmitOfflineTask(context.Context, *Config, string, string, bool) (string, error)
+}
+
 type OfflineTaskStatus struct {
+	ID    string
 	Hash  string
 	URL   string
 	State string

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/greenhats/anigo/internal/domain"
 )
@@ -54,6 +55,10 @@ func taskState(phase string) string {
 	}
 }
 func (p *PikPak) tasks(ctx context.Context, cfg *domain.Config) ([]remoteTask, error) {
+	if domain.CloudCacheEnabled(ctx) && time.Now().Before(p.taskCacheUntil) {
+		return p.taskCache, nil
+	}
+	p.taskCacheUntil = time.Time{}
 	query := url.Values{"type": {"offline"}, "limit": {"100"}}
 	out := []remoteTask{}
 	seen := map[string]bool{}
@@ -70,6 +75,7 @@ func (p *PikPak) tasks(ctx context.Context, cfg *domain.Config) ([]remoteTask, e
 		}
 		out = append(out, result.Tasks...)
 		if result.Next == "" {
+			p.taskCache, p.taskCacheUntil = append([]remoteTask(nil), out...), time.Now().Add(15*time.Second)
 			return out, nil
 		}
 		if seen[result.Next] {
@@ -99,17 +105,17 @@ func (p *PikPak) OfflineTasks(ctx context.Context, cfg *domain.Config) ([]domain
 				msg = "PikPak 云端离线下载失败"
 			}
 		}
-		out = append(out, domain.OfflineTaskStatus{Hash: magnetHash(task.Params.URL), URL: task.Params.URL, State: state, Error: msg})
+		out = append(out, domain.OfflineTaskStatus{ID: task.ID, Hash: magnetHash(task.Params.URL), URL: task.Params.URL, State: state, Error: msg})
 	}
 	return out, nil
 }
-func (p *PikPak) add(ctx context.Context, cfg *domain.Config, magnet, dest string, retry bool) error {
+func (p *PikPak) add(ctx context.Context, cfg *domain.Config, magnet, dest string, retry bool) (string, error) {
 	if strings.TrimSpace(magnet) == "" {
-		return errors.New("下载链接为空")
+		return "", errors.New("下载链接为空")
 	}
 	tasks, err := p.tasks(ctx, cfg)
 	if err != nil {
-		return err
+		return "", err
 	}
 	hash := magnetHash(magnet)
 	for _, task := range tasks {
@@ -117,49 +123,74 @@ func (p *PikPak) add(ctx context.Context, cfg *domain.Config, magnet, dest strin
 			continue
 		}
 		if taskState(task.Phase) != "failed" {
-			return nil
+			return task.ID, nil
 		}
 		if !retry {
-			return errors.New("PikPak 已有失败任务，等待重试")
+			return "", errors.New("PikPak 已有失败任务，等待重试")
 		}
 		if task.ID == "" {
-			return errors.New("PikPak 重试任务缺少 ID")
+			return "", errors.New("PikPak 重试任务缺少 ID")
 		}
 		// Retry the existing task in place; never delete cloud files.
 		query := url.Values{"id": {task.ID}, "type": {"offline"}, "create_type": {"RETRY"}}
-		return p.request(ctx, cfg, "GET", "/drive/v1/task?"+query.Encode(), nil, nil)
+		if err := p.request(ctx, cfg, "GET", "/drive/v1/task?"+query.Encode(), nil, nil); err != nil {
+			p.taskCacheUntil = time.Time{}
+			return "", err
+		}
+		task.Phase, task.Message = "PHASE_TYPE_RUNNING", ""
+		p.rememberTask(task)
+		return task.ID, nil
 	}
 	// Keep the same per-episode folder layout as the 115 driver.
 	parent, err := p.folder(ctx, cfg, dest, true)
 	if err != nil {
-		return err
+		return "", err
 	}
 	var result struct {
 		Task remoteTask `json:"task"`
 	}
 	err = p.request(ctx, cfg, "POST", filesPath, map[string]any{"kind": "drive#file", "parent_id": parent, "upload_type": "UPLOAD_TYPE_URL", "url": map[string]string{"url": magnet}}, &result)
 	if err != nil {
-		return err
+		p.taskCacheUntil = time.Time{}
+		p.folders = nil
+		return "", err
 	}
 	if result.Task.ID == "" {
-		return errors.New("PikPak 未返回离线任务 ID")
+		p.taskCacheUntil = time.Time{}
+		return "", errors.New("PikPak 未返回离线任务 ID")
 	}
 	if taskState(result.Task.Phase) == "failed" {
-		return errors.New("PikPak 拒绝离线任务")
+		p.taskCacheUntil = time.Time{}
+		return "", errors.New("PikPak 拒绝离线任务")
 	}
-	return nil
+	result.Task.Params.URL = magnet
+	p.rememberTask(result.Task)
+	return result.Task.ID, nil
+}
+
+// rememberTask updates the snapshot after mutations, so consecutive episodes
+// share one listing without losing duplicate detection.
+func (p *PikPak) rememberTask(task remoteTask) {
+	for i, old := range p.taskCache {
+		if old.ID == task.ID {
+			p.taskCache[i] = task
+			return
+		}
+	}
+	p.taskCache = append(p.taskCache, task)
+}
+func (p *PikPak) SubmitOfflineTask(ctx context.Context, cfg *domain.Config, magnet, dest string, retry bool) (string, error) {
+	if err := p.lock(ctx, cfg); err != nil {
+		return "", err
+	}
+	defer p.unlock()
+	return p.add(ctx, cfg, magnet, dest, retry)
 }
 func (p *PikPak) AddOfflineTask(ctx context.Context, cfg *domain.Config, magnet, dest string) error {
-	if err := p.lock(ctx, cfg); err != nil {
-		return err
-	}
-	defer p.unlock()
-	return p.add(ctx, cfg, magnet, dest, false)
+	_, err := p.SubmitOfflineTask(ctx, cfg, magnet, dest, false)
+	return err
 }
 func (p *PikPak) RetryOfflineTask(ctx context.Context, cfg *domain.Config, hash, magnet, dest string) error {
-	if err := p.lock(ctx, cfg); err != nil {
-		return err
-	}
-	defer p.unlock()
-	return p.add(ctx, cfg, magnet, dest, true)
+	_, err := p.SubmitOfflineTask(ctx, cfg, magnet, dest, true)
+	return err
 }

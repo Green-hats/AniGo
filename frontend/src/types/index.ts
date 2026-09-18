@@ -109,6 +109,7 @@ export interface Config {
   updateTotalEpisodeNumber: boolean
   forceUpdateTotalEpisodeNumber: boolean
   downloadTimeout: number
+  refreshTimeout: number
   notificationConfigList: NotificationConfig[]
   copyMasterToStandby: boolean
   sortType: string
@@ -132,9 +133,12 @@ export interface Config {
 
 export interface DownloadTask {
   provider?: string
+  accountId?: string
+  remoteId?: string
+  submittedAt?: number
   hash: string
   episode: number
-  state: 'pending' | 'submitted' | 'completed' | 'failed'
+  state: 'pending' | 'submitted' | 'completed' | 'failed' | 'exhausted' | 'unknown' | 'abandoned'
   attempts: number
   retryAt: number
   error?: string
@@ -142,7 +146,7 @@ export interface DownloadTask {
 
 export interface RefreshJob {
  id: string
- state: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+ state: 'waiting' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
  error?: string
  updatedAt: number
 }

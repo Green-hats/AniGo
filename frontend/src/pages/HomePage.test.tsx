@@ -8,7 +8,7 @@ import { api } from '../api/client'
 import type { Ani, ListAniData } from '../types'
 
 vi.mock('../api/client', () => ({ api: {
-  listAni: vi.fn(), refreshStatus: vi.fn(), refreshAll: vi.fn(), refreshAni: vi.fn(),
+  listAni: vi.fn(), recoverTask: vi.fn(), refreshStatus: vi.fn(), refreshAll: vi.fn(), refreshAni: vi.fn(),
   batchEnable: vi.fn(), deleteAni: vi.fn(), playList: vi.fn(), playTicket: vi.fn(),
 } }))
 
@@ -73,5 +73,43 @@ describe('HomePage feedback', () => {
     await userEvent.click(await screen.findByRole('button', { name: /用 mpv 播放/ }))
     await waitFor(() => expect(api.playTicket).toHaveBeenCalledWith('one', 'pc1'))
     expect(error).toHaveBeenCalledWith('播放凭证申请失败')
+  })
+})
+
+
+describe('下载任务恢复', () => {
+  const failedList = (): ListAniData => ({ ...list(), weekList: [{ weekLabel: '星期一', items: [{ ...ani, downloadTasks: [{ hash: 'aaaa', episode: 1, state: 'exhausted', attempts: 3, retryAt: 0, error: '云端失败' }] }] }] })
+
+  it('重试耗尽的任务可以手动重试，保存后刷新状态', async () => {
+    vi.mocked(api.listAni).mockResolvedValue(failedList())
+    vi.mocked(api.recoverTask).mockResolvedValue(null)
+    mount()
+    expect(await screen.findByText(/重试已耗尽/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '重试第 1 集' }))
+    await waitFor(() => expect(api.recoverTask).toHaveBeenCalledWith('one', 'aaaa', 1, 'retry'))
+    await waitFor(() => expect(api.listAni).toHaveBeenCalledTimes(2))
+  })
+
+  it('换源需要确认，并将失败提示传给用户', async () => {
+    vi.mocked(api.listAni).mockResolvedValue(failedList())
+    vi.mocked(api.recoverTask).mockRejectedValue(new Error('当前账号下未找到该任务'))
+    const error = vi.spyOn(message, 'error').mockImplementation(() => (() => {}) as ReturnType<typeof message.error>)
+    mount()
+    await userEvent.click(await screen.findByRole('button', { name: /换\s*源/ }))
+    expect(api.recoverTask).not.toHaveBeenCalled()
+    await userEvent.click(await screen.findByRole('button', { name: /OK|确\s*定/ }))
+    await waitFor(() => expect(api.recoverTask).toHaveBeenCalledWith('one', 'aaaa', 1, 'replace'))
+    expect(error).toHaveBeenCalledWith('当前账号下未找到该任务')
+  })
+
+  it('等待入队也保持忙碌；未知结果只允许查询', async () => {
+    const data = failedList()
+    data.weekList[0].items[0].downloadTasks![0].state = 'unknown'
+    vi.mocked(api.listAni).mockResolvedValue(data)
+    vi.mocked(api.refreshStatus).mockResolvedValue([{ id: 'one', state: 'waiting', updatedAt: 1 }])
+    mount()
+    expect(await screen.findByText('请刷新查询云端状态')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '重试第 1 集' })).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: /刷新全部/ })).toHaveClass('ant-btn-loading'))
   })
 })

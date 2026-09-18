@@ -22,7 +22,7 @@ import {
   PlaySquareOutlined,
 } from '@ant-design/icons'
 import { api } from '../api/client'
-import type { Ani, PlayItem } from '../types'
+import type { Ani, PlayItem, DownloadTask } from '../types'
 
 const { Text } = Typography
 
@@ -39,9 +39,9 @@ export default function HomePage() {
   const qc = useQueryClient()
   const { data, refetch, isPending, error } = useQuery({ queryKey: ['listAni'], queryFn: api.listAni, refetchInterval: 10_000 })
   const { data: jobs = [] } = useQuery({ queryKey: ['refreshStatus'], queryFn: api.refreshStatus, refetchInterval: 2000 })
-  const completed = jobs.filter(j => j.state !== 'queued' && j.state !== 'running').map(j => `${j.id}:${j.updatedAt}`).join('|')
+  const completed = jobs.filter(j => j.state !== 'waiting' && j.state !== 'queued' && j.state !== 'running').map(j => `${j.id}:${j.updatedAt}`).join('|')
   useEffect(() => { if (completed) void qc.invalidateQueries({ queryKey: ['listAni'] }) }, [completed, qc])
-  const active = (id?: string) => jobs.some(j => (!id || j.id === id) && (j.state === 'queued' || j.state === 'running'))
+  const active = (id?: string) => jobs.some(j => (!id || j.id === id) && (j.state === 'waiting' || j.state === 'queued' || j.state === 'running'))
   const [refreshAllPending, setRefreshAllPending] = useState(false)
   const [launching, setLaunching] = useState<string | null>(null)
   const playRequest = useRef(0)
@@ -49,6 +49,17 @@ export default function HomePage() {
   const [playAni, setPlayAni] = useState<Ani | null>(null)
   const [playItems, setPlayItems] = useState<PlayItem[] | null>(null)
   const [playLoading, setPlayLoading] = useState(false)
+  const [recovering, setRecovering] = useState<string | null>(null)
+  const handleRecover = async (ani: Ani, task: DownloadTask, action: 'retry' | 'replace') => {
+    const key = `${ani.id}:${task.episode}:${task.hash}`
+    setRecovering(key)
+    try {
+      await api.recoverTask(ani.id, task.hash, task.episode, action)
+      message.success(action === 'retry' ? '已重置重试次数；刷新后继续下载' : '已跳过此资源；刷新时寻找其他版本')
+      await Promise.all([refetch(), qc.invalidateQueries({ queryKey: ['refreshStatus'] })])
+    } catch (e) { message.error((e as Error).message) }
+    finally { setRecovering(null) }
+  }
 
   const handleDelete = async (id: string) => {
     try {
@@ -158,7 +169,22 @@ export default function HomePage() {
                         {ani.subgroup && ` · ${ani.subgroup}`}
                       </Text>
                       {ani.downloadTasks?.some(t => t.state === 'submitted' || t.state === 'pending') && <Tag color="processing">云端处理中</Tag>}
-                      {ani.downloadTasks?.some(t => t.state === 'failed') && <Tooltip title={ani.downloadTasks.filter(t => t.state === 'failed').map(t => `第 ${t.episode} 集：${t.error}`).join('；')}><Tag color="error">下载失败</Tag></Tooltip>}
+                      {ani.downloadTasks?.filter(t => ['failed', 'exhausted', 'unknown', 'abandoned'].includes(t.state)).map(task => (
+                        <div key={`${task.accountId}:${task.episode}:${task.hash}`} style={{ marginTop: 4 }}>
+                          <Tooltip title={task.error}>
+                            <Tag color={task.state === 'unknown' || task.state === 'abandoned' ? 'warning' : 'error'}>
+                              第 {task.episode} 集 · {{ failed: '下载失败', exhausted: '重试已耗尽', unknown: '待确认', abandoned: '等待其他资源', pending: '', submitted: '', completed: '' }[task.state]}
+                            </Tag>
+                          </Tooltip>
+                          {task.state === 'unknown' && <Text type="secondary">请刷新查询云端状态</Text>}
+                          {(task.state === 'failed' || task.state === 'exhausted') && <Space size="small">
+                            <Button size="small" disabled={!ani.enable || active(ani.id) || recovering !== null} onClick={() => handleRecover(ani, task, 'retry')}>重试第 {task.episode} 集</Button>
+                            <Popconfirm title="跳过此资源并寻找其他版本？" description="没有其他版本时会等待 RSS 更新。" onConfirm={() => handleRecover(ani, task, 'replace')}>
+                              <Button size="small" disabled={!ani.enable || active(ani.id) || recovering !== null}>换源</Button>
+                            </Popconfirm>
+                          </Space>}
+                        </div>
+                      ))}
                       {jobs.find(j => j.id === ani.id)?.state === 'failed' && <Text type="danger" style={{ display: 'block' }}>{jobs.find(j => j.id === ani.id)?.error}</Text>}
                     </div>
                     <Space>

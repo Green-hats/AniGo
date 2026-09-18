@@ -109,6 +109,7 @@ export const api = {
     request<{ downloadPath: string }>('POST', '/api/downloadPath', ani),
   refreshAll: () => request<null>('POST', '/api/refreshAll'),
   refreshStatus: () => request<import('../types').RefreshJob[]>('POST', '/api/refreshStatus'),
+  recoverTask: (id: string, hash: string, episode: number, action: 'retry' | 'replace') => request<null>('POST', '/api/recoverTask', { id, hash, episode, action }),
   refreshAni: (id: string) => request<null>('POST', '/api/refreshAni', { id }),
   rssToAni: (dto: import('../types').RssToAniDTO) =>
     request<import('../types').Ani>('POST', '/api/rssToAni', dto),

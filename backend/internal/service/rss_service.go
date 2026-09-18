@@ -132,6 +132,21 @@ func (s *RssService) GetItems(ctx context.Context, ani *domain.Ani) ([]*domain.I
 	if len(items) == 0 && len(sourceErrors) > 0 {
 		return nil, errors.Join(sourceErrors...)
 	}
+	// Exclude terminal failed resources before scoring so another version can win.
+	filtered := items[:0]
+	for _, item := range items {
+		blocked := false
+		for _, task := range ani.DownloadTasks {
+			if taskBelongs(task, cfg) && (task.State == "exhausted" || task.State == "abandoned") && strings.EqualFold(task.Hash, item.InfoHash) {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			filtered = append(filtered, item)
+		}
+	}
+	items = filtered
 	// 每集选一个最优版本
 	items = scoring.PickBestPerEpisode(items, ani.Subgroup)
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Episode < items[j].Episode })
