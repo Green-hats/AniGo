@@ -1,6 +1,7 @@
 package task
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -90,5 +91,33 @@ func TestBgmLoopStartsAndStops(t *testing.T) {
 	tm.Stop()
 	if tm.running {
 		t.Error("Stop 后 running 应为 false")
+	}
+}
+
+func TestScheduleChangeWakesAndUnrelatedSettingsDoNot(t *testing.T) {
+	tm := newTestTaskManager(t)
+	tm.ctx, tm.cancel = context.WithCancel(context.Background())
+	defer tm.cancel()
+	cfg, changed := tm.cfg.Watch()
+	done := make(chan bool, 1)
+	go func() { done <- tm.waitConfig(time.Hour, cfg, changed, false) }()
+	if err := tm.cfg.SetConfigRaw([]byte(`{"logsMax":123}`)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-done:
+		t.Fatal("unrelated settings reset RSS")
+	case <-time.After(20 * time.Millisecond):
+	}
+	if err := tm.cfg.SetConfigRaw([]byte(`{"rssSleepMinutes":1}`)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case ok := <-done:
+		if !ok {
+			t.Fatal("cancelled")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("new period ignored")
 	}
 }

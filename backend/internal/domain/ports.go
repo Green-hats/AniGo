@@ -89,6 +89,7 @@ type CloudDriver interface {
 
 // LoginStatus 描述最近一次网盘登录结果。
 type LoginStatus struct {
+	CheckedAt  int64  `json:"checkedAt"`
 	Configured bool   `json:"configured"`
 	OK         bool   `json:"loginOK"`
 	Message    string `json:"message"`

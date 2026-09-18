@@ -204,10 +204,20 @@ func (q *RefreshQueue) execute(ctx context.Context, id string) (err error) {
 	return q.run(ctx, id)
 }
 
-func (s *DownloadService) StartBackground(ctx context.Context) { s.queue.Start(ctx) }
-func (s *DownloadService) StopBackground()                     { s.queue.Stop() }
-func (s *DownloadService) RefreshStatus() []RefreshJob         { return s.queue.Snapshot() }
-func (s *DownloadService) EnqueueRefresh(ids ...string) error  { return s.queue.Enqueue(ids...) }
+func (s *DownloadService) StartBackground(ctx context.Context) {
+	if s.notify != nil {
+		s.notify.Start(ctx)
+	}
+	s.queue.Start(ctx)
+}
+func (s *DownloadService) StopBackground() {
+	s.queue.Stop()
+	if s.notify != nil {
+		s.notify.Stop()
+	}
+}
+func (s *DownloadService) RefreshStatus() []RefreshJob        { return s.queue.Snapshot() }
+func (s *DownloadService) EnqueueRefresh(ids ...string) error { return s.queue.Enqueue(ids...) }
 func (s *DownloadService) EnqueueAll() error {
 	ids := []string{}
 	for _, ani := range s.cfg.AniList() {
@@ -217,3 +227,5 @@ func (s *DownloadService) EnqueueAll() error {
 	}
 	return s.queue.EnqueueBatch(ids...)
 }
+
+func (s *DownloadService) EnqueueBatch(ids []string) error { return s.queue.EnqueueBatch(ids...) }

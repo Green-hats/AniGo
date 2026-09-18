@@ -14,6 +14,10 @@ func bindLegacyTasks(list []*domain.Ani, cfg *domain.Config) bool {
 		if a == nil {
 			continue
 		}
+		if a.TaskSummary != nil {
+			a.TaskSummary = nil
+			changed = true
+		}
 		for i := range a.DownloadTasks {
 			task := &a.DownloadTasks[i]
 			if task.AccountID == "" {
@@ -40,3 +44,5 @@ func (s *ConfigService) AniByID(id string) *domain.Ani {
 	}
 	return nil
 }
+
+func TaskBelongs(task domain.DownloadTask, cfg *domain.Config) bool { return taskBelongs(task, cfg) }

@@ -30,6 +30,7 @@ func (s *DownloadService) PlayList(ctx context.Context, ani *domain.Ani) ([]doma
 	fingerprint, _ := json.Marshal([]any{ani.ID, ani.Title, ani.Season, ani.BgmUrl, ani.Subgroup, ani.CustomDownloadPath, ani.CustomDownloadPathTemplate, cfg.DownloadPathTemplate, cfg.OvaDownloadPathTemplate, cfg.DownloadToolType, cfg.Pan115Cookie, cfg.PikpakEmail, cfg.PikpakPassword})
 	key := fmt.Sprintf("%x", sha256.Sum256(fingerprint))
 	s.playMu.Lock()
+	generation := s.playGeneration
 	if e, ok := s.playCache[key]; ok && time.Now().Before(e.expire) {
 		items := slices.Clone(e.items)
 		s.playMu.Unlock()
@@ -93,7 +94,9 @@ func (s *DownloadService) PlayList(ctx context.Context, ani *domain.Ani) ([]doma
 			break
 		}
 	}
-	s.playCache[key] = &playCacheEntry{items: slices.Clone(items), expire: time.Now().Add(30 * time.Second)}
+	if generation == s.playGeneration {
+		s.playCache[key] = &playCacheEntry{items: slices.Clone(items), expire: time.Now().Add(30 * time.Second)}
+	}
 	s.playMu.Unlock()
 	return items, nil
 }
@@ -141,4 +144,24 @@ func extractEpisode(filename string) int {
 		}
 	}
 	return 0
+}
+
+func (s *DownloadService) ClearCaches(ctx context.Context) error {
+	select {
+	case s.gate <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	defer func() { <-s.gate }()
+	s.playMu.Lock()
+	s.playCache = map[string]*playCacheEntry{}
+	s.playGeneration++
+	s.playMu.Unlock()
+	cfg := s.cfg.Get()
+	if d, ok := s.cloud.Get(cfg).(interface {
+		ClearCache(context.Context, *domain.Config) error
+	}); ok {
+		return d.ClearCache(ctx, cfg)
+	}
+	return nil
 }

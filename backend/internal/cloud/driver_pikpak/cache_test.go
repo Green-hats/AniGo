@@ -111,3 +111,21 @@ func TestFolderCacheSurvivesAuthenticationRefresh(t *testing.T) {
 		t.Fatal("folder was not recached after auth refresh")
 	}
 }
+
+func TestClearCachePreservesCredentialsWithoutNetwork(t *testing.T) {
+	calls := 0
+	p, cfg := testDriver(t, func(w http.ResponseWriter, r *http.Request) { calls++; reply(w, map[string]any{}) })
+	if err := p.lock(context.Background(), cfg); err != nil {
+		t.Fatal(err)
+	}
+	p.access = "existing"
+	p.folders = map[string]folderEntry{"/shows": {id: "folder", expires: time.Now().Add(time.Minute)}}
+	p.taskCacheUntil = time.Now().Add(time.Minute)
+	p.unlock()
+	if err := p.ClearCache(context.Background(), cfg); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 0 || p.access != "existing" || len(p.folders) != 0 || !p.taskCacheUntil.IsZero() {
+		t.Fatal("clear did not invalidate data or logged out")
+	}
+}

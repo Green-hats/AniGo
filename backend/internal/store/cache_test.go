@@ -98,3 +98,26 @@ func TestCacheConcurrent(t *testing.T) {
 		t.Errorf("Size = %d, want 5", n)
 	}
 }
+func TestCacheBoundsAndPruneWithoutReads(t *testing.T) {
+	c := NewTTLCache()
+	for i := 0; i < cacheMaxEntries+100; i++ {
+		c.Put(string(rune(i)), "value", time.Hour)
+	}
+	if len(c.m) > cacheMaxEntries {
+		t.Fatal("entry limit ignored")
+	}
+	c.Put("large", string(make([]byte, cacheMaxBytes)), time.Hour)
+	if c.Contains("large") {
+		t.Fatal("oversized entry accepted")
+	}
+	c.mu.Lock()
+	for k, e := range c.m {
+		e.expiry = time.Now().Add(-time.Second)
+		c.m[k] = e
+	}
+	c.mu.Unlock()
+	c.Prune()
+	if len(c.m) != 0 || c.bytes != 0 {
+		t.Fatal("expired entries retained")
+	}
+}

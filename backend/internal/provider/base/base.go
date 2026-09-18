@@ -38,6 +38,7 @@ type Fetcher struct {
 
 	mu         sync.Mutex
 	httpClient *http.Client
+	proxyKey   string
 }
 
 // New 创建 Fetcher。
@@ -51,8 +52,14 @@ func New(cfg ConfigProvider) *Fetcher {
 func (f *Fetcher) client() *http.Client {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.httpClient == nil {
-		f.httpClient = util.ClientFor(f.Cfg.Get(), 20)
+	cfg := f.Cfg.Get()
+	key := domain.ProxyKey(cfg)
+	if f.httpClient == nil || f.proxyKey != key {
+		if f.httpClient != nil {
+			f.httpClient.CloseIdleConnections()
+		}
+		f.proxyKey = key
+		f.httpClient = util.ClientFor(cfg, 20)
 	}
 	return f.httpClient
 }

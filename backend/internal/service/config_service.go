@@ -20,11 +20,12 @@ import (
 // ConfigService 管理应用配置与订阅列表，
 // 在内存中持有它们，并通过 ConfigStore 端口持久化。
 type ConfigService struct {
-	mu     sync.RWMutex
-	store  domain.ConfigStore
-	cache  domain.Cache
-	cfg    *domain.Config
-	aniLst []*domain.Ani
+	mu      sync.RWMutex
+	store   domain.ConfigStore
+	cache   domain.Cache
+	cfg     *domain.Config
+	aniLst  []*domain.Ani
+	changed chan struct{}
 }
 
 // NewConfigService 从 store 加载配置与订阅。
@@ -43,10 +44,11 @@ func NewConfigService(store domain.ConfigStore, cache domain.Cache) (*ConfigServ
 		}
 	}
 	return &ConfigService{
-		store:  store,
-		cache:  cache,
-		cfg:    cfg,
-		aniLst: anis,
+		store:   store,
+		cache:   cache,
+		cfg:     cfg,
+		aniLst:  anis,
+		changed: make(chan struct{}),
 	}, nil
 }
 
@@ -94,6 +96,8 @@ func (s *ConfigService) SetConfigRaw(raw []byte) error {
 		return err
 	}
 	s.cfg = cur
+	close(s.changed)
+	s.changed = make(chan struct{})
 	return nil
 }
 
@@ -390,6 +394,8 @@ func (s *ConfigService) ImportConfig(zipPath string) error {
 		return err
 	}
 	s.cfg, s.aniLst = cfg, cloneAnis(list)
+	close(s.changed)
+	s.changed = make(chan struct{})
 	s.cache.Clear()
 	return nil
 }
@@ -433,4 +439,16 @@ func mergeConfigInto(cur *domain.Config, raw []byte) error {
 	merged.GitInfo = cur.GitInfo
 	*cur = *merged
 	return nil
+}
+
+// Watch returns a snapshot and its change signal under the same lock.
+func (s *ConfigService) Watch() (*domain.Config, <-chan struct{}) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.cfg.Clone(), s.changed
+}
+func (s *ConfigService) PruneCache() {
+	if c, ok := s.cache.(interface{ Prune() }); ok {
+		c.Prune()
+	}
 }

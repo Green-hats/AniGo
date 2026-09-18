@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -27,7 +28,13 @@ func (s *DownloadService) SyncDownload(ctx context.Context, list []*domain.Ani) 
 
 func (s *DownloadService) findAni(id string) *domain.Ani { return s.cfg.AniByID(id) }
 
-func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) error {
+func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) (resultErr error) {
+	original := ani.Clone()
+	defer func() {
+		if resultErr != nil && !errors.Is(resultErr, context.Canceled) {
+			s.notifyDownloadError(original, resultErr)
+		}
+	}()
 	select {
 	case s.gate <- struct{}{}:
 	case <-ctx.Done():
@@ -308,6 +315,11 @@ func (s *DownloadService) reconcileTasks(ctx context.Context, cfg *domain.Config
 	if err := s.saveTasks(ani.ID, changed); err != nil {
 		return errors.Join(statusErr, err)
 	}
+	for _, task := range changed {
+		if task.State == "failed" || task.State == "exhausted" || task.State == "unknown" {
+			s.notifyDownloadError(ani, fmt.Errorf("第 %g 集：%s", task.Episode, task.Error))
+		}
+	}
 	if statusErr != nil {
 		return statusErr
 	}
@@ -423,4 +435,17 @@ func taskProvider(provider string) string {
 		return "115"
 	}
 	return provider
+}
+
+func (s *DownloadService) notifyDownloadError(ani *domain.Ani, err error) {
+	if s.notify == nil || ani == nil {
+		return
+	}
+	cfg := s.cfg.Get()
+	key := fmt.Sprintf("notify:error:%s:%s:%x", ani.ID, domain.CloudAccountKey(cfg, cfg.DownloadToolType), sha256.Sum256([]byte(err.Error())))
+	if s.cache.Contains(key) {
+		return
+	}
+	s.cache.Put(key, "1", 10*time.Minute)
+	s.notifySend(ani, ani.Title+"："+err.Error(), true, domain.NotifyError)
 }

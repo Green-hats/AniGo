@@ -8,7 +8,7 @@ import { api } from '../api/client'
 import type { Ani, ListAniData } from '../types'
 
 vi.mock('../api/client', () => ({ api: {
-  listAni: vi.fn(), recoverTask: vi.fn(), refreshStatus: vi.fn(), refreshAll: vi.fn(), refreshAni: vi.fn(),
+  listAni: vi.fn(), taskHistory: vi.fn(), refreshBatch: vi.fn(), recoverTask: vi.fn(), refreshStatus: vi.fn(), refreshAll: vi.fn(), refreshAni: vi.fn(),
   batchEnable: vi.fn(), deleteAni: vi.fn(), playList: vi.fn(), playTicket: vi.fn(),
 } }))
 
@@ -58,7 +58,7 @@ describe('HomePage feedback', () => {
     const error = vi.spyOn(message, 'error').mockImplementation(() => (() => {}) as ReturnType<typeof message.error>)
     vi.mocked(api.batchEnable).mockRejectedValue(new Error('保存失败'))
     mount()
-    await userEvent.click(await screen.findByRole('button', { name: /停\s*用/ }))
+    await userEvent.click(await screen.findByRole('button', { name: /^停\s*用$/ }))
     await waitFor(() => expect(error).toHaveBeenCalledWith('保存失败'))
   })
 
@@ -111,5 +111,40 @@ describe('下载任务恢复', () => {
     expect(await screen.findByText('请刷新查询云端状态')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '重试第 1 集' })).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByRole('button', { name: /刷新全部/ })).toHaveClass('ant-btn-loading'))
+  })
+})
+
+describe('订阅管理', () => {
+  it('搜索后只批量操作当前可见选项，历史详情按需请求', async () => {
+    const data = list()
+    data.total = 2
+    data.weekList[0].items.push({ ...ani, id: 'two', title: '另一部动画' })
+    vi.mocked(api.listAni).mockResolvedValue(data)
+    vi.mocked(api.batchEnable).mockResolvedValue(null)
+    vi.mocked(api.taskHistory).mockResolvedValue({ total: 1, items: [{ hash: 'completed', episode: 1, state: 'completed', attempts: 1, retryAt: 0 }] })
+    mount()
+    await screen.findByText('另一部动画')
+    expect(api.taskHistory).not.toHaveBeenCalled()
+    await userEvent.type(screen.getByRole('searchbox', { name: '搜索订阅' }), '测试')
+    expect(screen.queryByText('另一部动画')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('checkbox', { name: '选择当前结果' }))
+    await userEvent.click(screen.getByRole('button', { name: '批量停用' }))
+    await waitFor(() => expect(api.batchEnable).toHaveBeenCalledWith(['one'], false))
+    await userEvent.click(screen.getByRole('button', { name: '任务记录' }))
+    await waitFor(() => expect(api.taskHistory).toHaveBeenCalledWith('one', 1))
+    expect(await screen.findByText('已完成')).toBeInTheDocument()
+  })
+
+  it('失败筛选只显示异常订阅', async () => {
+    const data = list()
+    data.total = 2
+    data.weekList[0].items.push({ ...ani, id: 'failed', title: '异常动画', downloadTasks: [{ episode: 2, hash: 'bad', state: 'failed', attempts: 1, retryAt: 0 }] })
+    vi.mocked(api.listAni).mockResolvedValue(data)
+    mount()
+    await screen.findByText('异常动画')
+    await userEvent.click(screen.getByRole('combobox', { name: '订阅筛选' }))
+    await userEvent.click(screen.getByText('失败 / 待确认'))
+    expect(screen.queryByText('测试番剧')).not.toBeInTheDocument()
+    expect(screen.getByText('异常动画')).toBeInTheDocument()
   })
 })

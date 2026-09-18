@@ -54,7 +54,14 @@ func (p *PikPak) GetLoginStatus() domain.LoginStatus {
 	defer p.stateMu.RUnlock()
 	return p.status
 }
-func (p *PikPak) setStatus(s domain.LoginStatus) { p.stateMu.Lock(); p.status = s; p.stateMu.Unlock() }
+func (p *PikPak) setStatus(s domain.LoginStatus) {
+	if s.OK || s.Message != "" {
+		s.CheckedAt = domain.NowMillis()
+	}
+	p.stateMu.Lock()
+	p.status = s
+	p.stateMu.Unlock()
+}
 func (p *PikPak) lock(ctx context.Context, cfg *domain.Config) error {
 	select {
 	case p.gate <- struct{}{}:
@@ -69,7 +76,7 @@ func (p *PikPak) lock(ctx context.Context, cfg *domain.Config) error {
 		p.unlock()
 		return errors.New("PikPak 配置为空")
 	}
-	data, _ := json.Marshal([]any{cfg.PikpakEmail, cfg.PikpakPassword, cfg.Proxy, cfg.ProxyHost, cfg.ProxyUsername, cfg.ProxyPassword})
+	data, _ := json.Marshal([]any{cfg.PikpakEmail, cfg.PikpakPassword, cfg.Proxy, cfg.ProxyHost, cfg.ProxyPort, cfg.ProxyUsername, cfg.ProxyPassword})
 	key := fmt.Sprintf("%x", sha256.Sum256(data))
 	if p.fingerprint != key {
 		if p.fingerprint != "" && p.client != nil {
@@ -304,4 +311,14 @@ func errorText(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+func (p *PikPak) ClearCache(ctx context.Context, cfg *domain.Config) error {
+	if err := p.lock(ctx, cfg); err != nil {
+		return err
+	}
+	defer p.unlock()
+	p.folders, p.taskCache = nil, nil
+	p.taskCacheUntil, p.loginChecked = time.Time{}, time.Time{}
+	return nil
 }

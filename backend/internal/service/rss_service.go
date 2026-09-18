@@ -25,12 +25,16 @@ type RssService struct {
 	cfg    *ConfigService
 	logger *log.Logger
 
-	parseGate   chan struct{}
-	cacheMu     sync.Mutex
-	parsedCache map[string]titleCacheEntry
-	failMu      sync.Mutex
-	failCount   map[string]int       // 每个源连续 AI 失败次数
-	failTime    map[string]time.Time // 每个源最近一次失败时间
+	parseGate       chan struct{}
+	cacheMu         sync.Mutex
+	cacheGeneration uint64
+	parsedCache     map[string]titleCacheEntry
+	observedMu      sync.Mutex
+	observedKey     string
+	observed        AIStatus
+	failMu          sync.Mutex
+	failCount       map[string]int       // 每个源连续 AI 失败次数
+	failTime        map[string]time.Time // 每个源最近一次失败时间
 }
 
 // ai 连续失败退避参数：连续失败达到阈值后，在退避期内不再发起 AI 请求。
@@ -60,6 +64,7 @@ func aiKey(ani *domain.Ani, rssURL string) string {
 func (s *RssService) ReloadAI() {
 	s.cacheMu.Lock()
 	s.parsedCache = map[string]titleCacheEntry{}
+	s.cacheGeneration++
 	s.cacheMu.Unlock()
 	s.failMu.Lock()
 	s.failCount, s.failTime = map[string]int{}, map[string]time.Time{}
@@ -67,11 +72,14 @@ func (s *RssService) ReloadAI() {
 }
 
 func (s *RssService) AIPing(ctx context.Context) (string, error) {
-	client := ai.New(s.cfg.Get())
+	cfg := s.cfg.Get()
+	client := ai.New(cfg)
 	if client == nil {
 		return "", errAINotConfigured
 	}
-	return client.Ping(ctx)
+	reply, err := client.Ping(ctx)
+	s.observeAI(cfg, "test", reply, err)
+	return reply, err
 }
 
 // errAINotConfigured 是 AI 未配置错误。
@@ -332,6 +340,7 @@ func (s *RssService) parseCached(ctx context.Context, cfg *domain.Config, ani *d
 	positions := map[string][]int{}
 	now := time.Now()
 	s.cacheMu.Lock()
+	generation := s.cacheGeneration
 	for key, entry := range s.parsedCache {
 		if !now.Before(entry.expires) {
 			delete(s.parsedCache, key)
@@ -353,6 +362,7 @@ func (s *RssService) parseCached(ctx context.Context, cfg *domain.Config, ani *d
 		end := min(start+32, len(missing))
 		batch := missing[start:end]
 		parsed, err := client.Parse(ctx, rules, batch)
+		s.observeAI(cfg, "parse", "", err)
 		if err != nil {
 			return nil, err
 		}
@@ -364,7 +374,9 @@ func (s *RssService) parseCached(ctx context.Context, cfg *domain.Config, ani *d
 					break
 				}
 			}
-			s.parsedCache[keyFor(title)] = titleCacheEntry{parsed[i], time.Now().Add(24 * time.Hour)}
+			if generation == s.cacheGeneration {
+				s.parsedCache[keyFor(title)] = titleCacheEntry{parsed[i], time.Now().Add(24 * time.Hour)}
+			}
 			for _, pos := range positions[title] {
 				results[pos] = parsed[i]
 			}
@@ -372,4 +384,30 @@ func (s *RssService) parseCached(ctx context.Context, cfg *domain.Config, ani *d
 		s.cacheMu.Unlock()
 	}
 	return results, nil
+}
+
+func aiConnectionKey(cfg *domain.Config) string {
+	b, _ := json.Marshal([]any{cfg.AiEnabled, cfg.AiProvider, cfg.AiBaseURL, cfg.AiModel, cfg.AiApiKey, domain.ProxyKey(cfg)})
+	return fmt.Sprintf("%x", sha256.Sum256(b))
+}
+func (s *RssService) observeAI(cfg *domain.Config, source, reply string, err error) {
+	result := AIStatus{Configured: cfg.AiApiKey != "", Enabled: cfg.AiEnabled, OK: err == nil, Reply: reply, CheckedAt: domain.NowMillis(), Source: source}
+	if err != nil {
+		result.Message = err.Error()
+	}
+	s.observedMu.Lock()
+	defer s.observedMu.Unlock()
+	if aiConnectionKey(s.cfg.Get()) == aiConnectionKey(cfg) {
+		s.observedKey, s.observed = aiConnectionKey(cfg), result
+	}
+}
+func (s *RssService) AIObservation() *AIStatus {
+	cfg := s.cfg.Get()
+	s.observedMu.Lock()
+	defer s.observedMu.Unlock()
+	if s.observedKey != aiConnectionKey(cfg) {
+		return &AIStatus{Configured: cfg.AiApiKey != "", Enabled: cfg.AiEnabled}
+	}
+	result := s.observed
+	return &result
 }

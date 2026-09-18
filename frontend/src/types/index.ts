@@ -152,6 +152,7 @@ export interface RefreshJob {
 }
 
 export interface Ani {
+  taskSummary?: Record<string, number>
   downloadTasks?: DownloadTask[]
   id: string
   title: string
@@ -260,6 +261,7 @@ export interface GardenItem {
 }
 
 export interface LoginStatus {
+  checkedAt?: number
   configured: boolean
   loginOK: boolean
   message: string
@@ -297,9 +299,19 @@ export interface LogEntry {
 }
 
 export interface ServiceStatus {
-  ai: { configured: boolean; ok: boolean; reply: string; message: string }
-  cloud: { configured: boolean; loginOK: boolean; message: string }
+  ai: { configured: boolean; enabled?: boolean; ok: boolean; reply: string; message: string; checkedAt?: number; source?: string }
+  cloud: LoginStatus
+  cloudName?: string
   memory: { allocMB: number; totalAllocMB: number; sysMB: number; numGC: number }
   cache: { count: number; bytes: number; sizeKB: number }
   uptimeSeconds: number
+}
+export interface NotificationDelivery {
+ id: string
+ channel: string
+ title: string
+ state: 'queued' | 'sending' | 'sent' | 'failed' | 'cancelled'
+ attempts: number
+ error?: string
+ updatedAt: number
 }

@@ -27,6 +27,7 @@ type StandbyRss struct {
 
 // Ani 是一个订阅，持久化为 ani.v2.json 的 JSON 数组。
 type Ani struct {
+	TaskSummary                  map[string]int `json:"taskSummary,omitempty"`
 	Sort                         int            `json:"sort"`
 	ID                           string         `json:"id"`
 	URL                          string         `json:"url"`
@@ -81,6 +82,12 @@ func (a *Ani) Clone() *Ani {
 		return nil
 	}
 	c := *a
+	if a.TaskSummary != nil {
+		c.TaskSummary = map[string]int{}
+		for k, v := range a.TaskSummary {
+			c.TaskSummary[k] = v
+		}
+	}
 	c.StandbyRssList = append([]StandbyRss(nil), a.StandbyRssList...)
 	c.Match = append([]string(nil), a.Match...)
 	c.Exclude = append([]string(nil), a.Exclude...)

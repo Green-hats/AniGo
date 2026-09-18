@@ -39,7 +39,9 @@ func (s *AniService) pathResolve(ctx context.Context) func(ani *domain.Ani) (str
 }
 
 // ListAni 返回分组的订阅列表。
-func (s *AniService) ListAni() *domain.ListAni {
+func (s *AniService) ListAni() *domain.ListAni { return s.ListAniView(false) }
+
+func (s *AniService) ListAniView(summary bool) *domain.ListAni {
 	cfg := s.cfg.Get()
 	list := s.cfg.AniList()
 	sortBy := cfg.SortType
@@ -49,9 +51,15 @@ func (s *AniService) ListAni() *domain.ListAni {
 		if a == nil {
 			continue
 		}
+		a.TaskSummary = map[string]int{}
 		visibleTasks := []domain.DownloadTask{}
 		for _, task := range a.DownloadTasks {
 			if taskBelongs(task, cfg) {
+				a.TaskSummary[task.State]++
+				if summary && task.State == "completed" {
+					continue
+				}
+				task.Torrent, task.Path = "", ""
 				visibleTasks = append(visibleTasks, task)
 			}
 		}
@@ -104,6 +112,8 @@ func (s *AniService) ListAni() *domain.ListAni {
 			}
 			wd := int(ani.ReleaseDate.Time().Weekday())
 			weekItems[weeks[wd]] = append(weekItems[weeks[wd]], ani)
+		} else {
+			weekItems["未定档"] = append(weekItems["未定档"], ani)
 		}
 	}
 	sort.SliceStable(releaseDateList, func(i, j int) bool { return releaseDateList[i] > releaseDateList[j] })
@@ -118,6 +128,9 @@ func (s *AniService) ListAni() *domain.ListAni {
 		if !containsStr(order, weeks[i]) {
 			order = append(order, weeks[i])
 		}
+	}
+	if len(weekItems["未定档"]) > 0 {
+		order = append(order, "未定档")
 	}
 	var weekList []domain.WeekAni
 	for _, w := range order {
@@ -268,6 +281,7 @@ func MergeAniMap(dst *domain.Ani, srcMap map[string]interface{}) error {
 	merged.DownloadedHash = dst.DownloadedHash
 	merged.DownloadedEps = dst.DownloadedEps
 	merged.DownloadTasks = dst.DownloadTasks
+	merged.TaskSummary = nil
 	*dst = *merged
 	return nil
 }
