@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/greenhats/anigo/internal/domain"
 	"github.com/greenhats/anigo/internal/log"
 	"github.com/greenhats/anigo/internal/service"
 )
@@ -38,7 +39,8 @@ func (t *TaskManager) Start() {
 	t.running = true
 	t.ctx, t.cancel = context.WithCancel(context.Background())
 	t.download.StartBackground(t.ctx)
-	t.wg.Add(2)
+	t.wg.Add(3)
+	go t.runCacheLoop()
 	go t.runRSSLoop()
 	go t.runBgmLoop()
 	if t.logger != nil {
@@ -66,7 +68,7 @@ func (t *TaskManager) Stop() {
 func (t *TaskManager) runRSSLoop() {
 	defer t.wg.Done()
 	for {
-		cfg := t.cfg.Get()
+		cfg, changed := t.cfg.Watch()
 		if cfg.Rss {
 			if err := t.download.EnqueueAll(); err != nil && t.logger != nil {
 				t.logger.Error("task", err.Error())
@@ -76,10 +78,8 @@ func (t *TaskManager) runRSSLoop() {
 		if interval <= 0 {
 			interval = 15 * time.Minute
 		}
-		select {
-		case <-t.ctx.Done():
+		if !t.waitConfig(interval, cfg, changed, false) {
 			return
-		case <-time.After(interval):
 		}
 	}
 }
@@ -91,20 +91,52 @@ func (t *TaskManager) runRSSLoop() {
 func (t *TaskManager) runBgmLoop() {
 	defer t.wg.Done()
 	for {
+		cfg, changed := t.cfg.Watch()
 		if t.meta != nil && t.ctx.Err() == nil {
 			t.meta.RefreshAll(t.ctx, t.cfg.AniList())
 		}
-		interval := time.Duration(t.cfg.Get().BgmRefreshHours) * time.Hour
+		interval := time.Duration(cfg.BgmRefreshHours) * time.Hour
 		if interval <= 0 {
 			interval = bgmRefreshInterval
 		}
-		select {
-		case <-t.ctx.Done():
+		if !t.waitConfig(interval, cfg, changed, true) {
 			return
-		case <-time.After(interval):
 		}
 	}
 }
 
 // bgmRefreshInterval 是 BGM 元数据刷新周期的默认值（配置未设置时使用）。
 const bgmRefreshInterval = 6 * time.Hour
+
+// Only scheduling changes interrupt a timer; unrelated settings do not trigger requests.
+func (t *TaskManager) waitConfig(interval time.Duration, cfg *domain.Config, changed <-chan struct{}, bgm bool) bool {
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+	for {
+		select {
+		case <-t.ctx.Done():
+			return false
+		case <-timer.C:
+			return true
+		case <-changed:
+			next, signal := t.cfg.Watch()
+			if (bgm && cfg.BgmRefreshHours != next.BgmRefreshHours) || (!bgm && (cfg.Rss != next.Rss || cfg.RssSleepMinutes != next.RssSleepMinutes)) {
+				return true
+			}
+			changed = signal
+		}
+	}
+}
+func (t *TaskManager) runCacheLoop() {
+	defer t.wg.Done()
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-t.ctx.Done():
+			return
+		case <-ticker.C:
+			t.cfg.PruneCache()
+		}
+	}
+}

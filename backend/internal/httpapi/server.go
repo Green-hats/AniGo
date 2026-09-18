@@ -86,11 +86,14 @@ func (s *Server) register() {
 
 	// 订阅
 	r.POST("/api/listAni", s.handleListAni)
+	r.POST("/api/taskHistory", s.handleTaskHistory)
+	r.POST("/api/refreshBatch", s.handleRefreshBatch)
 	r.POST("/api/addAni", s.handleAddAni)
 	r.POST("/api/setAni", s.handleSetAni)
 	r.POST("/api/deleteAni", s.handleDeleteAni)
 	r.POST("/api/batchEnable", s.handleBatchEnable)
 	r.POST("/api/refreshAni", s.handleRefreshAni)
+	r.POST("/api/recoverTask", s.handleRecoverTask)
 	r.POST("/api/previewAni", s.handlePreviewAni)
 	r.POST("/api/downloadPath", s.handleDownloadPath)
 
@@ -117,6 +120,18 @@ func (s *Server) register() {
 
 	// 通知
 	r.POST("/api/testNotification", s.handleTestNotification)
+	r.POST("/api/notifications", func(c *gin.Context) { ok(c, s.notify.Records()) })
+	r.POST("/api/retryNotification", func(c *gin.Context) {
+		var body domain.IdDTO
+		if !readJSONOrFail(c, &body) {
+			return
+		}
+		if err := s.notify.Retry(body.ID); err != nil {
+			fail(c, err.Error())
+			return
+		}
+		okMsg(c, "已加入补发队列")
+	})
 
 	// 日志
 	r.POST("/api/logs", s.handleLogs)
@@ -149,16 +164,25 @@ func (s *Server) handleSetConfig(c *gin.Context) {
 		fail(c, "body is empty")
 		return
 	}
+	before := s.cfg.Get()
 	if err := s.cfg.SetConfigRaw(raw); err != nil {
 		fail(c, err.Error())
 		return
 	}
+	after := s.cfg.Get()
+	if before.AiApiKey != after.AiApiKey || before.AiBaseURL != after.AiBaseURL || before.AiModel != after.AiModel || before.AiProvider != after.AiProvider || before.AiEnabled != after.AiEnabled || domain.ProxyKey(before) != domain.ProxyKey(after) {
+		s.rss.ReloadAI()
+	}
 	s.meta.Reload()
-	s.logs.Reload(s.cfg.Dir(), s.cfg.Get())
+	s.logs.Reload(s.cfg.Dir(), after)
 	okMsg(c, "修改成功")
 }
 
 func (s *Server) handleClearCache(c *gin.Context) {
+	if err := s.download.ClearCaches(c.Request.Context()); err != nil {
+		fail(c, err.Error())
+		return
+	}
 	s.cfg.ClearCache()
 	s.rss.ReloadAI()
 	okMsg(c, "清理完成")

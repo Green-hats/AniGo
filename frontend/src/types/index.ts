@@ -109,6 +109,7 @@ export interface Config {
   updateTotalEpisodeNumber: boolean
   forceUpdateTotalEpisodeNumber: boolean
   downloadTimeout: number
+  refreshTimeout: number
   notificationConfigList: NotificationConfig[]
   copyMasterToStandby: boolean
   sortType: string
@@ -132,9 +133,12 @@ export interface Config {
 
 export interface DownloadTask {
   provider?: string
+  accountId?: string
+  remoteId?: string
+  submittedAt?: number
   hash: string
   episode: number
-  state: 'pending' | 'submitted' | 'completed' | 'failed'
+  state: 'pending' | 'submitted' | 'completed' | 'failed' | 'exhausted' | 'unknown' | 'abandoned'
   attempts: number
   retryAt: number
   error?: string
@@ -142,12 +146,13 @@ export interface DownloadTask {
 
 export interface RefreshJob {
  id: string
- state: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+ state: 'waiting' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
  error?: string
  updatedAt: number
 }
 
 export interface Ani {
+  taskSummary?: Record<string, number>
   downloadTasks?: DownloadTask[]
   id: string
   title: string
@@ -256,6 +261,7 @@ export interface GardenItem {
 }
 
 export interface LoginStatus {
+  checkedAt?: number
   configured: boolean
   loginOK: boolean
   message: string
@@ -293,9 +299,19 @@ export interface LogEntry {
 }
 
 export interface ServiceStatus {
-  ai: { configured: boolean; ok: boolean; reply: string; message: string }
-  cloud: { configured: boolean; loginOK: boolean; message: string }
+  ai: { configured: boolean; enabled?: boolean; ok: boolean; reply: string; message: string; checkedAt?: number; source?: string }
+  cloud: LoginStatus
+  cloudName?: string
   memory: { allocMB: number; totalAllocMB: number; sysMB: number; numGC: number }
   cache: { count: number; bytes: number; sizeKB: number }
   uptimeSeconds: number
+}
+export interface NotificationDelivery {
+ id: string
+ channel: string
+ title: string
+ state: 'queued' | 'sending' | 'sent' | 'failed' | 'cancelled'
+ attempts: number
+ error?: string
+ updatedAt: number
 }

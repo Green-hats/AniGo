@@ -9,9 +9,15 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/greenhats/anigo/internal/domain"
 )
+
+type folderEntry struct {
+	id      string
+	expires time.Time
+}
 
 var errNotFound = errors.New("PikPak 路径不存在")
 
@@ -81,10 +87,19 @@ func (p *PikPak) folder(ctx context.Context, cfg *domain.Config, raw string, cre
 	if normalized == "/" {
 		return "", nil
 	}
-	parent := ""
+	parent, prefix := "", ""
+	if p.folders == nil {
+		p.folders = map[string]folderEntry{}
+	}
 	for _, name := range strings.Split(strings.TrimPrefix(normalized, "/"), "/") {
+		prefix += "/" + name
+		if entry, ok := p.folders[prefix]; ok && time.Now().Before(entry.expires) {
+			parent = entry.id
+			continue
+		}
 		files, err := p.list(ctx, cfg, parent)
 		if err != nil {
+			p.folders = nil
 			return "", err
 		}
 		id := ""
@@ -109,6 +124,10 @@ func (p *PikPak) folder(ctx context.Context, cfg *domain.Config, raw string, cre
 				return "", errors.New("PikPak 创建目录未返回 ID")
 			}
 		}
+		if p.folders == nil || len(p.folders) >= 4096 {
+			p.folders = map[string]folderEntry{}
+		}
+		p.folders[prefix] = folderEntry{id: id, expires: time.Now().Add(30 * time.Second)}
 		parent = id
 	}
 	return parent, nil
@@ -127,6 +146,7 @@ func (p *PikPak) lookup(ctx context.Context, cfg *domain.Config, raw string) (re
 	}
 	files, err := p.list(ctx, cfg, parent)
 	if err != nil {
+		p.folders = nil
 		return remoteFile{}, err
 	}
 	for _, file := range files {
@@ -147,6 +167,7 @@ func (p *PikPak) ListDir(ctx context.Context, cfg *domain.Config, raw string) ([
 	}
 	files, err := p.list(ctx, cfg, parent)
 	if err != nil {
+		p.folders = nil
 		return nil, err
 	}
 	result := make([]domain.CloudFile, 0, len(files))
@@ -219,6 +240,7 @@ func (p *PikPak) DeleteDir(ctx context.Context, cfg *domain.Config, raw string) 
 		return err
 	}
 	defer p.unlock()
+	defer func() { p.folders = nil; p.taskCacheUntil = time.Time{} }()
 	normalized, err := cloudPath(raw)
 	if err != nil {
 		return err

@@ -27,3 +27,23 @@ func TestPikPakSelectionAndSwitch(t *testing.T) {
 		t.Fatal("cannot switch back")
 	}
 }
+
+func TestCredentialAndProxyChangesResetDriverStatus(t *testing.T) {
+	r := NewRegistry()
+	cfg := domain.DefaultConfig()
+	first := r.Get(cfg)
+	cfg.Pan115Cookie = "UID=456"
+	second := r.Get(cfg)
+	if first == second {
+		t.Fatal("new credentials reused old status")
+	}
+	cfg.ProxyPort = 1234
+	third := r.Get(cfg)
+	if second == third {
+		t.Fatal("proxy changes reused old client")
+	}
+	cfg.LogsMax++
+	if r.Get(cfg) != third {
+		t.Fatal("unrelated setting discarded session")
+	}
+}

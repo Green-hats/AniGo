@@ -348,12 +348,15 @@ export default function SettingsPage() {
               </> : <Form.Item label="115 Cookie" name="pan115Cookie">
                 <Input.TextArea rows={3} placeholder="UID=...; CID=...; SEID=..." />
               </Form.Item>}
-              <Alert type="info" showIcon style={{ marginBottom: 16 }} title="切换网盘后，新任务使用所选网盘；历史已完成集数保留，云端文件不会自动迁移。" />
+              <Alert type="info" showIcon style={{ marginBottom: 16 }} title="切换网盘或账号后，旧账号任务会保留并暂停处理，切回后继续查询；历史已完成集数保留，云端文件不会自动迁移。" />
               <Form.Item label="下载重试次数" name="downloadRetry">
                 <InputNumber min={1} max={10} />
               </Form.Item>
-              <Form.Item label="下载超时（分钟）" name="downloadTimeout">
-                <InputNumber min={1} />
+              <Form.Item label="单个订阅刷新超时（分钟）" name="refreshTimeout" extra="超时后终止本轮刷新，继续处理下一个订阅。默认 5 分钟。">
+                <InputNumber min={1} max={1440} />
+              </Form.Item>
+              <Form.Item label="云端下载超时（分钟）" name="downloadTimeout" extra="超时显示待确认，继续查询云端状态，不自动重复提交。0 表示不限制。">
+                <InputNumber min={0} max={10080} />
               </Form.Item>
               <Form.Item label="延迟下载（分钟）" name="delayedDownload">
                 <InputNumber min={0} />

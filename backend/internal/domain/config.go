@@ -142,6 +142,7 @@ type Config struct {
 	ProcrastinatingDay             int                  `json:"procrastinatingDay"`
 	UpdateTotalEpisodeNumber       bool                 `json:"updateTotalEpisodeNumber"`
 	ForceUpdateTotalEpisodeNumber  bool                 `json:"forceUpdateTotalEpisodeNumber"`
+	RefreshTimeout                 int                  `json:"refreshTimeout"`
 	DownloadTimeout                int                  `json:"downloadTimeout"`
 	NotificationConfigList         []NotificationConfig `json:"notificationConfigList"`
 	CopyMasterToStandby            bool                 `json:"copyMasterToStandby"`
@@ -234,6 +235,7 @@ func DefaultConfig() *Config {
 		ProcrastinatingDay:        14,
 		UpdateTotalEpisodeNumber:  true,
 		DownloadTimeout:           60,
+		RefreshTimeout:            5,
 		SortType:                  "SCORE",
 		LimitLoginAttempts:        true,
 		ReverseProxyTrustIpList:   []string{"127.0.0.1"},

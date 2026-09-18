@@ -38,6 +38,10 @@ type PikPak struct {
 	fingerprint                               string
 	access, refresh, captcha, subject, device string
 	expiry                                    time.Time
+	taskCache                                 []remoteTask
+	taskCacheUntil                            time.Time
+	folders                                   map[string]folderEntry
+	loginChecked                              time.Time
 }
 
 func New() domain.CloudDriver { return newPikPak() }
@@ -50,7 +54,14 @@ func (p *PikPak) GetLoginStatus() domain.LoginStatus {
 	defer p.stateMu.RUnlock()
 	return p.status
 }
-func (p *PikPak) setStatus(s domain.LoginStatus) { p.stateMu.Lock(); p.status = s; p.stateMu.Unlock() }
+func (p *PikPak) setStatus(s domain.LoginStatus) {
+	if s.OK || s.Message != "" {
+		s.CheckedAt = domain.NowMillis()
+	}
+	p.stateMu.Lock()
+	p.status = s
+	p.stateMu.Unlock()
+}
 func (p *PikPak) lock(ctx context.Context, cfg *domain.Config) error {
 	select {
 	case p.gate <- struct{}{}:
@@ -65,7 +76,7 @@ func (p *PikPak) lock(ctx context.Context, cfg *domain.Config) error {
 		p.unlock()
 		return errors.New("PikPak 配置为空")
 	}
-	data, _ := json.Marshal([]any{cfg.PikpakEmail, cfg.PikpakPassword, cfg.Proxy, cfg.ProxyHost, cfg.ProxyUsername, cfg.ProxyPassword})
+	data, _ := json.Marshal([]any{cfg.PikpakEmail, cfg.PikpakPassword, cfg.Proxy, cfg.ProxyHost, cfg.ProxyPort, cfg.ProxyUsername, cfg.ProxyPassword})
 	key := fmt.Sprintf("%x", sha256.Sum256(data))
 	if p.fingerprint != key {
 		if p.fingerprint != "" && p.client != nil {
@@ -75,6 +86,8 @@ func (p *PikPak) lock(ctx context.Context, cfg *domain.Config) error {
 		p.fingerprint = key
 		p.access, p.refresh, p.captcha, p.subject = "", "", "", ""
 		p.expiry = time.Time{}
+		p.taskCache, p.folders = nil, nil
+		p.taskCacheUntil, p.loginChecked = time.Time{}, time.Time{}
 		p.device = fmt.Sprintf("%x", md5.Sum([]byte(strings.TrimSpace(cfg.PikpakEmail))))
 		p.setStatus(domain.LoginStatus{Configured: cfg.PikpakEmail != "" && cfg.PikpakPassword != ""})
 	}
@@ -251,6 +264,8 @@ func (p *PikPak) request(ctx context.Context, cfg *domain.Config, method, path s
 		if (remote.status == 401 || remote.code == 16) && !authRetried {
 			authRetried = true
 			p.expiry = time.Time{}
+			p.taskCache, p.folders = nil, nil
+			p.taskCacheUntil, p.loginChecked = time.Time{}, time.Time{}
 			if err := p.ensureLogin(ctx, cfg); err != nil {
 				return err
 			}
@@ -275,12 +290,18 @@ func (p *PikPak) Login(ctx context.Context, test bool, cfg *domain.Config) (bool
 		return false, err
 	}
 	defer p.unlock()
+	if domain.CloudCacheEnabled(ctx) && time.Since(p.loginChecked) < 15*time.Second && time.Now().Before(p.expiry) {
+		return true, nil
+	}
 	var result struct {
 		Files []json.RawMessage `json:"files"`
 	}
 	err := p.request(ctx, cfg, "GET", filesPath+"?limit=1&parent_id=", nil, &result)
 	if err == nil && result.Files == nil {
 		err = errors.New("PikPak 文件列表响应无效")
+	}
+	if err == nil {
+		p.loginChecked = time.Now()
 	}
 	p.setStatus(domain.LoginStatus{Configured: cfg.PikpakEmail != "" && cfg.PikpakPassword != "", OK: err == nil, Message: errorText(err)})
 	return err == nil, err
@@ -290,4 +311,14 @@ func errorText(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+func (p *PikPak) ClearCache(ctx context.Context, cfg *domain.Config) error {
+	if err := p.lock(ctx, cfg); err != nil {
+		return err
+	}
+	defer p.unlock()
+	p.folders, p.taskCache = nil, nil
+	p.taskCacheUntil, p.loginChecked = time.Time{}, time.Time{}
+	return nil
 }

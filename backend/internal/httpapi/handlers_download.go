@@ -127,3 +127,25 @@ func (s *Server) handleDeleteTorrent(c *gin.Context) {
 	}
 	okMsg(c, "删除成功")
 }
+
+// Recovery changes local intent only; the regular queue owns network execution.
+func (s *Server) handleRecoverTask(c *gin.Context) {
+	var body struct {
+		ID      string  `json:"id"`
+		Hash    string  `json:"hash"`
+		Episode float64 `json:"episode"`
+		Action  string  `json:"action"`
+	}
+	if !readJSONOrFail(c, &body) {
+		return
+	}
+	if err := s.download.RecoverTask(c.Request.Context(), body.ID, body.Hash, body.Episode, body.Action); err != nil {
+		fail(c, err.Error())
+		return
+	}
+	if err := s.download.EnqueueRefresh(body.ID); err != nil {
+		okMsg(c, "恢复操作已保存，请稍后点击刷新执行")
+		return
+	}
+	okMsg(c, "恢复操作已保存并加入刷新队列")
+}

@@ -89,6 +89,7 @@ type CloudDriver interface {
 
 // LoginStatus 描述最近一次网盘登录结果。
 type LoginStatus struct {
+	CheckedAt  int64  `json:"checkedAt"`
 	Configured bool   `json:"configured"`
 	OK         bool   `json:"loginOK"`
 	Message    string `json:"message"`
@@ -114,7 +115,14 @@ type OfflineTaskTracker interface {
 	OfflineTasks(context.Context, *Config) ([]OfflineTaskStatus, error)
 	RetryOfflineTask(context.Context, *Config, string, string, string) error
 }
+
+// OfflineTaskSubmitter returns a stable upstream task ID when supported.
+type OfflineTaskSubmitter interface {
+	SubmitOfflineTask(context.Context, *Config, string, string, bool) (string, error)
+}
+
 type OfflineTaskStatus struct {
+	ID    string
 	Hash  string
 	URL   string
 	State string

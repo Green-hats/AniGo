@@ -59,3 +59,8 @@ func sampleAni() *domain.Ani {
 		ReleaseDate:          domain.Date(time.Now()),
 	}
 }
+
+func (s *NotifyService) Start(ctx context.Context)          { s.registry.Start(ctx) }
+func (s *NotifyService) Stop()                              { s.registry.Stop() }
+func (s *NotifyService) Records() []notifier.DeliveryRecord { return s.registry.Records() }
+func (s *NotifyService) Retry(id string) error              { return s.registry.Retry(id) }

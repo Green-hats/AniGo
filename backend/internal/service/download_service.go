@@ -24,10 +24,11 @@ type DownloadService struct {
 	notify *NotifyService
 	logger *log.Logger
 
-	gate      chan struct{}
-	queue     *RefreshQueue
-	playMu    sync.Mutex
-	playCache map[string]*playCacheEntry // 播放列表短缓存（key=订阅id）
+	gate           chan struct{}
+	queue          *RefreshQueue
+	playMu         sync.Mutex
+	playGeneration uint64
+	playCache      map[string]*playCacheEntry // 播放列表短缓存（key=订阅id）
 }
 
 // CloudProvider 是下载服务对网盘注册表的依赖接口，
@@ -90,7 +91,14 @@ func (s *DownloadService) Login(ctx context.Context, test bool) bool {
 
 // DownloadLoginStatus 返回网盘登录状态。
 func (s *DownloadService) DownloadLoginStatus() domain.LoginStatus {
-	return s.Driver().GetLoginStatus()
+	cfg := s.cfg.Get()
+	status := s.DriverForConfig(cfg).GetLoginStatus()
+	if taskProvider(cfg.DownloadToolType) == "pikpak" {
+		status.Configured = strings.TrimSpace(cfg.PikpakEmail) != "" && cfg.PikpakPassword != ""
+	} else {
+		status.Configured = strings.TrimSpace(cfg.Pan115Cookie) != ""
+	}
+	return status
 }
 
 // logf 写入下载日志（logger 未注入时静默跳过）。

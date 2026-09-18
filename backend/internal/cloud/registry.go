@@ -33,9 +33,10 @@ func Register(name string, factory DriverFactory) {
 
 // Registry 是网盘驱动注册表，根据配置的 DownloadToolType 选择驱动。
 type Registry struct {
-	mu       sync.Mutex
-	current  domain.CloudDriver
-	toolType string
+	mu          sync.Mutex
+	current     domain.CloudDriver
+	toolType    string
+	fingerprint string
 }
 
 // NewRegistry 创建空注册表。
@@ -55,9 +56,11 @@ func (r *Registry) Get(cfg *domain.Config) domain.CloudDriver {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.current != nil && r.toolType == tt {
+	key := domain.CloudConnectionKey(cfg)
+	if r.current != nil && r.toolType == tt && r.fingerprint == key {
 		return r.current
 	}
+	r.fingerprint = key
 	r.current = build(tt)
 	r.toolType = tt
 	return r.current
@@ -67,6 +70,7 @@ func (r *Registry) Get(cfg *domain.Config) domain.CloudDriver {
 func (r *Registry) Reload(cfg *domain.Config) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.fingerprint = domain.CloudConnectionKey(cfg)
 	r.current = build(strings.ToLower(strings.TrimSpace(cfg.DownloadToolType)))
 	r.toolType = strings.ToLower(strings.TrimSpace(cfg.DownloadToolType))
 }

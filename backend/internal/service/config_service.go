@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -19,11 +20,12 @@ import (
 // ConfigService 管理应用配置与订阅列表，
 // 在内存中持有它们，并通过 ConfigStore 端口持久化。
 type ConfigService struct {
-	mu     sync.RWMutex
-	store  domain.ConfigStore
-	cache  domain.Cache
-	cfg    *domain.Config
-	aniLst []*domain.Ani
+	mu      sync.RWMutex
+	store   domain.ConfigStore
+	cache   domain.Cache
+	cfg     *domain.Config
+	aniLst  []*domain.Ani
+	changed chan struct{}
 }
 
 // NewConfigService 从 store 加载配置与订阅。
@@ -36,11 +38,17 @@ func NewConfigService(store domain.ConfigStore, cache domain.Cache) (*ConfigServ
 	if err != nil {
 		return nil, err
 	}
+	if bindLegacyTasks(anis, cfg) {
+		if err := store.SaveAnis(anis); err != nil {
+			return nil, err
+		}
+	}
 	return &ConfigService{
-		store:  store,
-		cache:  cache,
-		cfg:    cfg,
-		aniLst: anis,
+		store:   store,
+		cache:   cache,
+		cfg:     cfg,
+		aniLst:  anis,
+		changed: make(chan struct{}),
 	}, nil
 }
 
@@ -81,10 +89,15 @@ func (s *ConfigService) SetConfigRaw(raw []byte) error {
 	if err := mergeConfigInto(cur, raw); err != nil {
 		return err
 	}
+	if cur.RefreshTimeout < 0 || cur.RefreshTimeout > 1440 || cur.DownloadTimeout < 0 || cur.DownloadTimeout > 10080 {
+		return fmt.Errorf("超时设置超出范围")
+	}
 	if err := s.store.SaveConfig(cur); err != nil {
 		return err
 	}
 	s.cfg = cur
+	close(s.changed)
+	s.changed = make(chan struct{})
 	return nil
 }
 
@@ -143,6 +156,10 @@ func (s *ConfigService) UpdateAniList(update func(*[]*domain.Ani) error) error {
 	if err := update(&list); err != nil {
 		return err
 	}
+	bindLegacyTasks(list, s.cfg)
+	if reflect.DeepEqual(list, s.aniLst) {
+		return nil
+	}
 	if err := s.store.SaveAnis(list); err != nil {
 		return err
 	}
@@ -153,14 +170,30 @@ func (s *ConfigService) UpdateAniList(update func(*[]*domain.Ani) error) error {
 var ErrAniNotFound = fmt.Errorf("订阅不存在")
 
 func (s *ConfigService) UpdateAni(id string, update func(*domain.Ani) error) error {
-	return s.UpdateAniList(func(list *[]*domain.Ani) error {
-		for _, ani := range *list {
-			if ani != nil && ani.ID == id {
-				return update(ani)
-			}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, ani := range s.aniLst {
+		if ani == nil || ani.ID != id {
+			continue
 		}
-		return ErrAniNotFound
-	})
+		next := ani.Clone()
+		if err := update(next); err != nil {
+			return err
+		}
+		bindLegacyTasks([]*domain.Ani{next}, s.cfg)
+		if reflect.DeepEqual(ani, next) {
+			return nil
+		}
+		list := append([]*domain.Ani(nil), s.aniLst...)
+		list[i] = next
+		if err := s.store.SaveAnis(list); err != nil {
+			return err
+		}
+		list[i] = next.Clone()
+		s.aniLst = list
+		return nil
+	}
+	return ErrAniNotFound
 }
 
 // ClearCache 清空内存 TTL 缓存。
@@ -300,6 +333,9 @@ func (s *ConfigService) ImportConfig(zipPath string) error {
 	if err := json.Unmarshal(cfgBytes, cfg); err != nil {
 		return fmt.Errorf("配置无效: %w", err)
 	}
+	if cfg.RefreshTimeout < 0 || cfg.RefreshTimeout > 1440 || cfg.DownloadTimeout < 0 || cfg.DownloadTimeout > 10080 {
+		return fmt.Errorf("备份中的超时设置超出范围")
+	}
 	if err := json.Unmarshal(aniBytes, &list); err != nil {
 		return fmt.Errorf("订阅无效: %w", err)
 	}
@@ -320,7 +356,7 @@ func (s *ConfigService) ImportConfig(zipPath string) error {
 				return fmt.Errorf("下载记录无效")
 			}
 			switch task.State {
-			case "pending", "submitted", "completed", "failed":
+			case "pending", "submitted", "completed", "failed", "exhausted", "unknown", "abandoned":
 			default:
 				return fmt.Errorf("下载状态无效")
 			}
@@ -343,6 +379,7 @@ func (s *ConfigService) ImportConfig(zipPath string) error {
 	if err != nil {
 		return err
 	}
+	bindLegacyTasks(list, cfg)
 	files["ani.v2.json"], err = json.MarshalIndent(list, "", "  ")
 	if err != nil {
 		return err
@@ -357,6 +394,8 @@ func (s *ConfigService) ImportConfig(zipPath string) error {
 		return err
 	}
 	s.cfg, s.aniLst = cfg, cloneAnis(list)
+	close(s.changed)
+	s.changed = make(chan struct{})
 	s.cache.Clear()
 	return nil
 }
@@ -400,4 +439,16 @@ func mergeConfigInto(cur *domain.Config, raw []byte) error {
 	merged.GitInfo = cur.GitInfo
 	*cur = *merged
 	return nil
+}
+
+// Watch returns a snapshot and its change signal under the same lock.
+func (s *ConfigService) Watch() (*domain.Config, <-chan struct{}) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.cfg.Clone(), s.changed
+}
+func (s *ConfigService) PruneCache() {
+	if c, ok := s.cache.(interface{ Prune() }); ok {
+		c.Prune()
+	}
 }

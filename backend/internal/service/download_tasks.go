@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -25,16 +26,15 @@ func (s *DownloadService) SyncDownload(ctx context.Context, list []*domain.Ani) 
 	}
 }
 
-func (s *DownloadService) findAni(id string) *domain.Ani {
-	for _, a := range s.cfg.AniList() {
-		if a != nil && a.ID == id {
-			return a
-		}
-	}
-	return nil
-}
+func (s *DownloadService) findAni(id string) *domain.Ani { return s.cfg.AniByID(id) }
 
-func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) error {
+func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) (resultErr error) {
+	original := ani.Clone()
+	defer func() {
+		if resultErr != nil && !errors.Is(resultErr, context.Canceled) {
+			s.notifyDownloadError(original, resultErr)
+		}
+	}()
 	select {
 	case s.gate <- struct{}{}:
 	case <-ctx.Done():
@@ -52,6 +52,9 @@ func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) erro
 		return fmt.Errorf("订阅已停用")
 	}
 	cfg := s.cfg.Get()
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(refreshTimeout(cfg))*time.Minute)
+	defer cancel()
+	ctx = domain.WithCloudCache(ctx)
 	driver := s.cloud.Get(cfg)
 	if driver == nil {
 		return fmt.Errorf("未配置网盘驱动")
@@ -71,7 +74,7 @@ func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) erro
 	// 失败任务保留原磁力和路径，RSS 条目移出窗口后仍能重试。
 	for i := range ani.DownloadTasks {
 		task := &ani.DownloadTasks[i]
-		if taskProvider(task.Provider) != taskProvider(cfg.DownloadToolType) {
+		if !taskBelongs(*task, cfg) {
 			continue
 		}
 		if containsFloat(ani.NotDownload, task.Episode) || containsFloat(ani.Downloaded, task.Episode) {
@@ -102,7 +105,7 @@ func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) erro
 		}
 		found := false
 		for _, task := range ani.DownloadTasks {
-			if taskProvider(task.Provider) == taskProvider(cfg.DownloadToolType) && task.Episode == item.Episode {
+			if taskBelongs(task, cfg) && task.Episode == item.Episode && task.State != "exhausted" && task.State != "abandoned" {
 				found = true
 				break
 			}
@@ -116,7 +119,7 @@ func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) erro
 		if !item.PubDate.Time().IsZero() && cfg.DelayedDownload > 0 && time.Since(item.PubDate.Time()) < time.Duration(cfg.DelayedDownload)*time.Minute {
 			continue
 		}
-		task := domain.DownloadTask{Provider: taskProvider(cfg.DownloadToolType), Hash: strings.ToLower(item.InfoHash), Episode: item.Episode, Torrent: item.Torrent, Path: savePath + "/" + item.ReName, State: "pending"}
+		task := domain.DownloadTask{AccountID: domain.CloudAccountKey(cfg, cfg.DownloadToolType), Provider: taskProvider(cfg.DownloadToolType), Hash: strings.ToLower(item.InfoHash), Episode: item.Episode, Torrent: item.Torrent, Path: savePath + "/" + item.ReName, State: "pending"}
 		ani.DownloadTasks = append(ani.DownloadTasks, task)
 		if err := s.submitTask(ctx, cfg, driver, ani, &ani.DownloadTasks[len(ani.DownloadTasks)-1]); err != nil {
 			failures = append(failures, err)
@@ -134,26 +137,38 @@ func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) erro
 }
 
 func (s *DownloadService) saveTask(id string, task domain.DownloadTask) error {
+	return s.saveTasks(id, []domain.DownloadTask{task})
+}
+
+// A reconciliation writes all changed tasks once; submission still persists its
+// intent before the remote mutation and its result afterwards for crash recovery.
+func (s *DownloadService) saveTasks(id string, tasks []domain.DownloadTask) error {
+	if len(tasks) == 0 {
+		return nil
+	}
 	return s.cfg.UpdateAni(id, func(a *domain.Ani) error {
-		found := false
-		for i := range a.DownloadTasks {
-			if taskProvider(a.DownloadTasks[i].Provider) == taskProvider(task.Provider) && a.DownloadTasks[i].Hash == task.Hash && a.DownloadTasks[i].Episode == task.Episode {
-				a.DownloadTasks[i] = task
-				found = true
-				break
+		for _, task := range tasks {
+			found, wasCompleted := false, false
+			for i := range a.DownloadTasks {
+				if sameTask(a.DownloadTasks[i], task) {
+					wasCompleted = a.DownloadTasks[i].State == "completed"
+					a.DownloadTasks[i] = task
+					found = true
+					break
+				}
 			}
-		}
-		if !found {
-			a.DownloadTasks = append(a.DownloadTasks, task)
-		}
-		if task.State == "completed" {
-			if !containsFloat(a.Downloaded, task.Episode) {
-				a.Downloaded = append(a.Downloaded, task.Episode)
+			if !found {
+				a.DownloadTasks = append(a.DownloadTasks, task)
 			}
-			if !containsStr(a.DownloadedHash, task.Hash) {
-				a.DownloadedHash = append(a.DownloadedHash, task.Hash)
+			if task.State == "completed" && !wasCompleted {
+				if !containsFloat(a.Downloaded, task.Episode) {
+					a.Downloaded = append(a.Downloaded, task.Episode)
+				}
+				if !containsStr(a.DownloadedHash, task.Hash) {
+					a.DownloadedHash = append(a.DownloadedHash, task.Hash)
+				}
+				a.LastDownloadTime = domain.NowMillis()
 			}
-			a.LastDownloadTime = domain.NowMillis()
 		}
 		unique := map[float64]bool{}
 		for _, ep := range a.Downloaded {
@@ -174,6 +189,9 @@ func (s *DownloadService) submitTask(ctx context.Context, cfg *domain.Config, dr
 	if latest == nil || !latest.Enable {
 		return fmt.Errorf("订阅已删除或停用")
 	}
+	if !taskBelongs(*task, s.cfg.Get()) {
+		return fmt.Errorf("网盘账号已变更，旧任务已暂停")
+	}
 	previous := task.State
 	task.State, task.Error, task.UpdatedAt = "pending", "", domain.NowMillis()
 	task.Attempts++
@@ -182,7 +200,13 @@ func (s *DownloadService) submitTask(ctx context.Context, cfg *domain.Config, dr
 		return err
 	}
 	var err error
-	if tracker, ok := driver.(domain.OfflineTaskTracker); ok && previous == "failed" {
+	if submitter, ok := driver.(domain.OfflineTaskSubmitter); ok {
+		var remoteID string
+		remoteID, err = submitter.SubmitOfflineTask(ctx, cfg, task.Torrent, task.Path, previous == "failed")
+		if remoteID != "" {
+			task.RemoteID = remoteID
+		}
+	} else if tracker, ok := driver.(domain.OfflineTaskTracker); ok && previous == "failed" {
 		err = tracker.RetryOfflineTask(ctx, cfg, task.Hash, task.Torrent, task.Path)
 	} else {
 		err = driver.AddOfflineTask(ctx, cfg, task.Torrent, task.Path)
@@ -190,8 +214,14 @@ func (s *DownloadService) submitTask(ctx context.Context, cfg *domain.Config, dr
 	task.UpdatedAt = domain.NowMillis()
 	if err != nil {
 		task.State, task.Error = "failed", err.Error()
+		if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			task.State, task.Error = "unknown", "提交结果待确认："+err.Error()
+		} else if task.Attempts >= 1+max(0, cfg.DownloadRetry) {
+			task.State = "exhausted"
+		}
 	} else {
 		task.State = "submitted"
+		task.SubmittedAt = domain.NowMillis()
 	}
 	if saveErr := s.saveTask(ani.ID, *task); saveErr != nil {
 		return errors.Join(err, saveErr)
@@ -208,7 +238,7 @@ func (s *DownloadService) submitTask(ctx context.Context, cfg *domain.Config, dr
 func (s *DownloadService) reconcileTasks(ctx context.Context, cfg *domain.Config, driver domain.CloudDriver, ani *domain.Ani) error {
 	pending := false
 	for _, task := range ani.DownloadTasks {
-		if taskProvider(task.Provider) == taskProvider(cfg.DownloadToolType) && task.State != "completed" {
+		if taskBelongs(task, cfg) && task.State != "completed" && task.State != "abandoned" {
 			pending = true
 			break
 		}
@@ -216,40 +246,133 @@ func (s *DownloadService) reconcileTasks(ctx context.Context, cfg *domain.Config
 	if !pending {
 		return nil
 	}
-	tracker, ok := driver.(domain.OfflineTaskTracker)
-	if !ok {
-		return nil
+	var statuses []domain.OfflineTaskStatus
+	var statusErr error
+	if tracker, ok := driver.(domain.OfflineTaskTracker); ok {
+		var err error
+		statuses, err = tracker.OfflineTasks(ctx, cfg)
+		if err != nil {
+			statusErr = fmt.Errorf("查询云端下载状态: %w", err)
+		}
 	}
-	statuses, err := tracker.OfflineTasks(ctx, cfg)
-	if err != nil {
-		return fmt.Errorf("查询云端下载状态: %w", err)
+	byID, byHash, byURL := map[string]domain.OfflineTaskStatus{}, map[string]domain.OfflineTaskStatus{}, map[string]domain.OfflineTaskStatus{}
+	for _, remote := range statuses {
+		if remote.ID != "" {
+			byID[remote.ID] = remote
+		}
+		if remote.Hash != "" {
+			byHash[strings.ToLower(remote.Hash)] = remote
+		}
+		if remote.URL != "" {
+			byURL[remote.URL] = remote
+		}
 	}
+	changed := []domain.DownloadTask{}
 	for i := range ani.DownloadTasks {
 		task := &ani.DownloadTasks[i]
-		if taskProvider(task.Provider) != taskProvider(cfg.DownloadToolType) {
+		if !taskBelongs(*task, cfg) || task.State == "completed" || task.State == "abandoned" {
 			continue
 		}
-		if task.State == "completed" {
-			continue
+		before := *task
+		remote, found := byID[task.RemoteID]
+		if task.RemoteID == "" {
+			remote, found = byHash[strings.ToLower(task.Hash)]
+			if !found {
+				remote, found = byURL[task.Torrent]
+			}
 		}
-		for _, remote := range statuses {
-			if (remote.Hash == "" || !strings.EqualFold(remote.Hash, task.Hash)) && (remote.URL == "" || remote.URL != task.Torrent) {
-				continue
+		if found {
+			task.State, task.Error = remote.State, remote.Error
+			if remote.ID != "" {
+				task.RemoteID = remote.ID
 			}
-			task.State, task.Error, task.UpdatedAt = remote.State, remote.Error, domain.NowMillis()
-			if err := s.saveTask(ani.ID, *task); err != nil {
-				return err
+		}
+		// Pending intent may survive a crash before its submission result was saved.
+		// Only explicit remote failure is safe to retry after an ambiguous submission.
+		if task.State == "pending" && task.Attempts > 0 && !found {
+			task.State, task.Error = "unknown", "上次提交结果待确认，请检查云端任务"
+		}
+		if task.State == "failed" && task.Attempts >= 1+max(0, cfg.DownloadRetry) {
+			task.State = "exhausted"
+		}
+		if task.State == "submitted" || task.State == "unknown" {
+			if task.SubmittedAt == 0 {
+				task.SubmittedAt = domain.NowMillis()
 			}
-			if task.State == "completed" {
-				if !containsFloat(ani.Downloaded, task.Episode) {
-					ani.Downloaded = append(ani.Downloaded, task.Episode)
-				}
+			if cfg.DownloadTimeout > 0 && domain.NowMillis()-task.SubmittedAt >= int64(time.Duration(min(cfg.DownloadTimeout, 10080))*time.Minute/time.Millisecond) {
+				task.State, task.Error = "unknown", "云端下载超时，等待确认；可刷新查询，不会重复提交"
+			}
+		}
+		if *task != before {
+			task.UpdatedAt = domain.NowMillis()
+			changed = append(changed, *task)
+			if task.State == "completed" && !containsFloat(ani.Downloaded, task.Episode) {
+				ani.Downloaded = append(ani.Downloaded, task.Episode)
 				s.logf("INFO", "download", "%s 第 %g 集云端下载完成", ani.Title, task.Episode)
 			}
-			break
 		}
 	}
+	if err := s.saveTasks(ani.ID, changed); err != nil {
+		return errors.Join(statusErr, err)
+	}
+	for _, task := range changed {
+		if task.State == "failed" || task.State == "exhausted" || task.State == "unknown" {
+			s.notifyDownloadError(ani, fmt.Errorf("第 %g 集：%s", task.Episode, task.Error))
+		}
+	}
+	if statusErr != nil {
+		return statusErr
+	}
 	return s.finishSubscription(cfg, ani.ID)
+}
+
+func refreshTimeout(cfg *domain.Config) int {
+	if cfg.RefreshTimeout <= 0 {
+		return 5
+	}
+	return min(cfg.RefreshTimeout, 1440)
+}
+
+// RecoverTask only changes a failed record. It cannot transfer another account's
+// tasks or restart an unconfirmed submission. Work is scheduled separately.
+func (s *DownloadService) RecoverTask(ctx context.Context, id, hash string, episode float64, action string) error {
+	if action != "retry" && action != "replace" {
+		return fmt.Errorf("不支持的恢复操作")
+	}
+	select {
+	case s.gate <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	defer func() { <-s.gate }()
+	cfg := s.cfg.Get()
+	return s.cfg.UpdateAni(id, func(a *domain.Ani) error {
+		if !a.Enable {
+			return fmt.Errorf("请先启用订阅")
+		}
+		for _, t := range a.DownloadTasks {
+			if taskBelongs(t, cfg) && t.Episode == episode && (t.State == "submitted" || t.State == "pending" || t.State == "unknown" || t.State == "completed") {
+				return fmt.Errorf("该集正在处理或已完成，请先刷新确认")
+			}
+		}
+		for i := range a.DownloadTasks {
+			t := &a.DownloadTasks[i]
+			if !taskBelongs(*t, cfg) || t.Hash != hash || t.Episode != episode {
+				continue
+			}
+			if t.State != "failed" && t.State != "exhausted" {
+				return fmt.Errorf("仅失败任务可重试或换源")
+			}
+			if action == "replace" {
+				t.State, t.Error = "abandoned", "已跳过此资源，等待其他版本"
+			} else {
+				t.State, t.Error, t.Attempts, t.RetryAt = "failed", "", 0, 0
+			}
+			t.UpdatedAt = domain.NowMillis()
+			return nil
+		}
+		return fmt.Errorf("当前账号下未找到该任务")
+	})
 }
 
 func (s *DownloadService) finishSubscription(cfg *domain.Config, id string) error {
@@ -312,4 +435,17 @@ func taskProvider(provider string) string {
 		return "115"
 	}
 	return provider
+}
+
+func (s *DownloadService) notifyDownloadError(ani *domain.Ani, err error) {
+	if s.notify == nil || ani == nil {
+		return
+	}
+	cfg := s.cfg.Get()
+	key := fmt.Sprintf("notify:error:%s:%s:%x", ani.ID, domain.CloudAccountKey(cfg, cfg.DownloadToolType), sha256.Sum256([]byte(err.Error())))
+	if s.cache.Contains(key) {
+		return
+	}
+	s.cache.Put(key, "1", 10*time.Minute)
+	s.notifySend(ani, ani.Title+"："+err.Error(), true, domain.NotifyError)
 }

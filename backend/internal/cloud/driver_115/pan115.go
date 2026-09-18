@@ -21,6 +21,7 @@ import (
 type Pan115 struct {
 	clientMu   sync.Mutex
 	client     *http.Client
+	proxyKey   string
 	stateMu    sync.RWMutex
 	loginState domain.LoginStatus
 	// reqFn 是可替换的底层请求函数（默认指向 request，测试可注入）。
@@ -57,7 +58,12 @@ func (p *Pan115) Name() string { return "115" }
 func (p *Pan115) httpClient(cfg *domain.Config) *http.Client {
 	p.clientMu.Lock()
 	defer p.clientMu.Unlock()
-	if p.client == nil {
+	key := domain.ProxyKey(cfg)
+	if p.client == nil || p.proxyKey != key {
+		if p.client != nil {
+			p.client.CloseIdleConnections()
+		}
+		p.proxyKey = key
 		p.client = util.ClientFor(cfg, 20)
 	}
 	return p.client
@@ -72,6 +78,7 @@ func (p *Pan115) GetLoginStatus() domain.LoginStatus {
 
 func (p *Pan115) setLogin(s domain.LoginStatus) {
 	p.stateMu.Lock()
+	s.CheckedAt = domain.NowMillis()
 	p.loginState = s
 	p.stateMu.Unlock()
 }

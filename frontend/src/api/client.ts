@@ -95,7 +95,9 @@ export const api = {
   },
 
   // 订阅
-  listAni: () => request<import('../types').ListAniData>('POST', '/api/listAni'),
+  listAni: () => request<import('../types').ListAniData>('POST', '/api/listAni?summary=true'),
+  taskHistory: (id: string, page: number) => request<{ total: number; items: import('../types').DownloadTask[] }>('POST', '/api/taskHistory', { id, offset: (page - 1) * 20, limit: 20 }),
+  refreshBatch: (ids: string[]) => request<null>('POST', '/api/refreshBatch', ids),
   addAni: (ani: Partial<import('../types').Ani>) =>
     request<null>('POST', '/api/addAni', ani),
   setAni: (ani: Partial<import('../types').Ani>) =>
@@ -109,6 +111,7 @@ export const api = {
     request<{ downloadPath: string }>('POST', '/api/downloadPath', ani),
   refreshAll: () => request<null>('POST', '/api/refreshAll'),
   refreshStatus: () => request<import('../types').RefreshJob[]>('POST', '/api/refreshStatus'),
+  recoverTask: (id: string, hash: string, episode: number, action: 'retry' | 'replace') => request<null>('POST', '/api/recoverTask', { id, hash, episode, action }),
   refreshAni: (id: string) => request<null>('POST', '/api/refreshAni', { id }),
   rssToAni: (dto: import('../types').RssToAniDTO) =>
     request<import('../types').Ani>('POST', '/api/rssToAni', dto),
@@ -135,6 +138,8 @@ export const api = {
     request<import('../types').GardenGroup[]>('POST', `/api/gardenGroup?subject=${encodeURIComponent(subject)}`),
 
   // 通知
+  notifications: () => request<import('../types').NotificationDelivery[]>('POST', '/api/notifications'),
+  retryNotification: (id: string) => request<null>('POST', '/api/retryNotification', { id }),
   testNotification: (nc: import('../types').NotificationConfig) =>
     request<null>('POST', '/api/testNotification', nc),
 
