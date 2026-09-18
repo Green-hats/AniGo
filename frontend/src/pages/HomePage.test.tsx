@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { message } from 'antd'
@@ -14,18 +14,29 @@ vi.mock('../api/client', () => ({ api: {
 
 const ani = { id: 'one', title: '测试番剧', enable: true, season: 1, score: 0, downloadedEps: 0, currentEpisodeNumber: 5, totalEpisodeNumber: 12 } as Ani
 const list = (completed = 0): ListAniData => ({ total: 1, releaseDateList: [], weekList: [{ weekLabel: '星期一', items: [{ ...ani, downloadedEps: completed }] }] })
+const clients: QueryClient[] = []
 
 function mount() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  clients.push(qc)
   render(<QueryClientProvider client={qc}><HomePage /></QueryClientProvider>)
   return qc
 }
 
 beforeEach(() => {
+  // Static messages create a separate React root with timers outside render() cleanup.
+  vi.spyOn(message, 'success').mockImplementation(() => (() => {}) as ReturnType<typeof message.success>)
   vi.mocked(api.listAni).mockResolvedValue(list())
   vi.mocked(api.refreshStatus).mockResolvedValue([])
 })
-afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks() })
+afterEach(async () => {
+  await act(async () => {
+    cleanup()
+    for (const client of clients.splice(0)) client.clear()
+  })
+  vi.restoreAllMocks()
+  vi.clearAllMocks()
+})
 
 describe('HomePage feedback', () => {
   it('显示加载错误，支持重试', async () => {
