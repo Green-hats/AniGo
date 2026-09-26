@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Tabs, Form, Input, Switch, InputNumber, Button, Divider, message, Space, Select, Card, Upload, Alert, Skeleton } from 'antd'
-import { DeleteOutlined, PlusOutlined, SendOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons'
+import { DeleteOutlined, PlusOutlined, SendOutlined, DownloadOutlined, UploadOutlined, QrcodeOutlined } from '@ant-design/icons'
+import QRLoginModal from '../components/QRLoginModal'
 import { api } from '../api/client'
 import type { Config, NotificationConfig } from '../types'
 
@@ -143,6 +144,7 @@ export default function SettingsPage() {
   const [form] = Form.useForm<Config>()
   const [saving, setSaving] = useState(false)
   const [testingDownload, setTestingDownload] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
   const downloadTool = Form.useWatch('downloadToolType', { form, preserve: true }) ?? cfg?.downloadToolType ?? '115'
 
   useEffect(() => {
@@ -170,6 +172,11 @@ export default function SettingsPage() {
     } catch (e) {
       message.error(`AI 连通失败: ${(e as Error).message}`)
     }
+  }
+
+  const handleQRSuccess = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['config'] })
+    message.success('115 扫码登录成功，Cookie 已自动保存')
   }
 
   const handleDownloadTest = async () => {
@@ -244,6 +251,7 @@ export default function SettingsPage() {
   if (error) return <Alert type="error" title="配置加载失败" description={error.message} action={<Button onClick={() => refetch()}>重试</Button>} />
 
   return (
+    <>
     <Tabs
       items={[
         {
@@ -345,7 +353,7 @@ export default function SettingsPage() {
                 <Form.Item label="PikPak 密码" name="pikpakPassword">
                   <Input.Password autoComplete="new-password" placeholder="PikPak 账号密码" />
                 </Form.Item>
-              </> : <Form.Item label="115 Cookie" name="pan115Cookie">
+              </> : <Form.Item label="115 Cookie" name="pan115Cookie" extra="可点击「扫码登录」自动获取">
                 <Input.TextArea rows={3} placeholder="UID=...; CID=...; SEID=..." />
               </Form.Item>}
               <Alert type="info" showIcon style={{ marginBottom: 16 }} title="切换网盘后，新任务使用所选网盘；历史已完成集数保留，云端文件不会自动迁移。" />
@@ -362,6 +370,9 @@ export default function SettingsPage() {
                 <Switch />
               </Form.Item>
               <Space>
+                {downloadTool !== 'pikpak' && (
+                  <Button icon={<QrcodeOutlined />} onClick={() => setQrOpen(true)}>扫码登录</Button>
+                )}
                 <Button onClick={handleDownloadTest} loading={testingDownload}>测试 {downloadTool === 'pikpak' ? 'PikPak' : '115'} 登录</Button>
                 <Button type="primary" onClick={handleSave} loading={saving}>
                   保存
@@ -561,5 +572,7 @@ export default function SettingsPage() {
         },
       ]}
     />
+    <QRLoginModal open={qrOpen} onClose={() => setQrOpen(false)} onSuccess={handleQRSuccess} />
+    </>
   )
 }

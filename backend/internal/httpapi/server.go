@@ -96,6 +96,11 @@ func (s *Server) register() {
 
 	// 下载
 	r.POST("/api/downloadLoginTest", s.handleDownloadLoginTest)
+
+	// 115 扫码登录
+	r.POST("/api/qrCreate", s.handleQRCreate)
+	r.POST("/api/qrStatus", s.handleQRStatus)
+	r.POST("/api/qrCancel", s.handleQRCancel)
 	r.POST("/api/downloadStatus", s.handleDownloadStatus)
 	r.POST("/api/refreshAll", s.handleRefreshAll)
 	r.POST("/api/refreshStatus", func(c *gin.Context) { ok(c, s.download.RefreshStatus()) })
