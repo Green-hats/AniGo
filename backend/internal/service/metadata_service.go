@@ -181,9 +181,9 @@ func (s *MetadataService) RefreshAll(ctx context.Context, list []*domain.Ani) {
 		if cfg.ForceUpdateTotalEpisodeNumber && total > 0 {
 			ani.TotalEpisodeNumber = total
 		}
-		aired := s.bgm.GetAiredEps(ctx, info)
-		if aired > 0 && aired != ani.BgmAiredEps {
-			ani.BgmAiredEps = aired
+		ani.BgmAiredEps = nil
+		if aired, err := s.bgm.GetAiredEps(ctx, info); err == nil {
+			ani.BgmAiredEps = &aired
 		}
 		if ctx.Err() != nil {
 			return
@@ -229,7 +229,10 @@ func (s *MetadataService) ToAni(ctx context.Context, info *domain.BgmInfo, ani *
 	ani.Season = bgm.GetSeason(info)
 	ani.TotalEpisodeNumber = s.bgm.GetEps(ctx, info)
 	// BGM 已播出集数：按剧集 airdate <= 今天 统计（真实播出进度）
-	ani.BgmAiredEps = s.bgm.GetAiredEps(ctx, info)
+	ani.BgmAiredEps = nil
+	if aired, err := s.bgm.GetAiredEps(ctx, info); err == nil {
+		ani.BgmAiredEps = &aired
+	}
 	ani.Ova = ova
 	ani.Score = score
 	if !info.Date.Time().IsZero() {

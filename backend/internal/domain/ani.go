@@ -49,7 +49,7 @@ type Ani struct {
 	Archived                     bool           `json:"archived"`
 	CurrentEpisodeNumber         int            `json:"currentEpisodeNumber"`
 	TotalEpisodeNumber           int            `json:"totalEpisodeNumber"`
-	BgmAiredEps                  int            `json:"bgmAiredEps"`
+	BgmAiredEps                  *int           `json:"bgmAiredEps"`
 	DownloadedEps                int            `json:"downloadedEps"`
 	Type                         string         `json:"type"`
 	BgmUrl                       string         `json:"bgmUrl"`
@@ -82,6 +82,10 @@ func (a *Ani) Clone() *Ani {
 		return nil
 	}
 	c := *a
+	if a.BgmAiredEps != nil {
+		aired := *a.BgmAiredEps
+		c.BgmAiredEps = &aired
+	}
 	c.StandbyRssList = append([]StandbyRss(nil), a.StandbyRssList...)
 	c.Match = append([]string(nil), a.Match...)
 	c.Exclude = append([]string(nil), a.Exclude...)

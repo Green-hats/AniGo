@@ -28,6 +28,14 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks() })
 
 describe('HomePage feedback', () => {
+  it.each([0, 5, null])('更新集数仅使用 Bangumi 进度：%s', async (aired) => {
+    const data = list(4)
+    data.weekList[0].items[0] = { ...ani, downloadedEps: 4, bgmAiredEps: aired, totalEpisodeNumber: 13, currentEpisodeNumber: 9 }
+    vi.mocked(api.listAni).mockResolvedValue(data)
+    mount()
+    expect(await screen.findByText(new RegExp(`已完成 4 / 更新 ${aired === null ? '\\?' : aired} / 共 13 集`))).toBeInTheDocument()
+  })
+
   it('显示加载错误，支持重试', async () => {
     vi.mocked(api.listAni).mockRejectedValueOnce(new Error('网络断开'))
     mount()

@@ -12,6 +12,7 @@ import (
 
 	"github.com/greenhats/anigo/internal/domain"
 	"github.com/greenhats/anigo/internal/provider/base"
+	"github.com/greenhats/anigo/internal/util"
 )
 
 // BGM 是 Bangumi 元数据客户端。
@@ -32,7 +33,10 @@ func New(cfg base.ConfigProvider, cache base.Cache) *BGM {
 
 // RefreshTokenFromConfig 根据配置重建鉴权头（配置变更后调用）。
 func (b *BGM) RefreshTokenFromConfig() {
-	headers := map[string]string{"Accept": "application/json"}
+	headers := map[string]string{
+		"Accept":     "application/json",
+		"User-Agent": "Green-hats/AniGo/" + util.Version + " (https://github.com/Green-hats/AniGo)",
+	}
 	if cfg := b.Cfg.Get(); cfg != nil && cfg.BgmToken != "" {
 		headers["Authorization"] = "Bearer " + cfg.BgmToken
 	}
@@ -97,33 +101,39 @@ func (b *BGM) GetInfo(ctx context.Context, subjectID string) (*domain.BgmInfo, e
 	return info, nil
 }
 
-// GetEpisodes 获取剧集列表（缓存 5 分钟）。
+// GetEpisodes 分页获取全部正篇分集（缓存 5 分钟）。失败时返回错误，避免误用 wiki 话数。
 func (b *BGM) GetEpisodes(ctx context.Context, subjectID string) ([]*domain.BgmEpisode, error) {
-	key := "bgm:eps:" + subjectID
+	if subjectID == "" {
+		return nil, errors.New("subjectId 为空")
+	}
+	key := "bgm:eps:main:" + subjectID
 	var cached []*domain.BgmEpisode
 	if b.cache.Get(key, &cached) {
 		return cached, nil
 	}
-	var eps []*domain.BgmEpisode
-	for _, typ := range []int{0, 1} {
+	eps := []*domain.BgmEpisode{}
+	for offset := 0; ; {
 		var body struct {
-			Data []domain.BgmEpisode `json:"data"`
+			Total int                 `json:"total"`
+			Data  []domain.BgmEpisode `json:"data"`
 		}
-		u := fmt.Sprintf("%s/v0/episodes?subject_id=%s&type=%d&limit=100&offset=0", b.api(), subjectID, typ)
+		u := fmt.Sprintf("%s/v0/episodes?subject_id=%s&type=0&limit=100&offset=%d", b.api(), url.QueryEscape(subjectID), offset)
 		if err := b.Get(ctx, u, &body); err != nil {
-			continue
+			return nil, fmt.Errorf("获取 Bangumi 正篇分集失败: %w", err)
+		}
+		if len(body.Data) == 0 && offset < body.Total {
+			return nil, errors.New("Bangumi 正篇分集分页不完整")
 		}
 		for i := range body.Data {
 			e := body.Data[i]
 			eps = append(eps, &e)
 		}
-		if len(eps) > 0 {
+		offset += len(body.Data)
+		if offset >= body.Total {
 			break
 		}
 	}
-	if len(eps) > 0 {
-		b.cache.Put(key, eps, 5*time.Minute)
-	}
+	b.cache.Put(key, eps, 5*time.Minute)
 	return eps, nil
 }
 
@@ -134,8 +144,8 @@ func parseSubject(m map[string]interface{}) *domain.BgmInfo {
 		URL:           "https://bgm.tv/subject/" + strVal(m["id"]),
 		Name:          strVal(m["name"]),
 		NameCn:        strVal(m["name_cn"]),
-		Eps:           intVal(m["eps"]),            // 已播出集数
-		TotalEpisodes: intVal(m["total_episodes"]), // 总集数
+		Eps:           intVal(m["eps"]),            // wiki 话数，不能用作播出进度
+		TotalEpisodes: intVal(m["total_episodes"]), // 数据库章节数
 		Platform:      strVal(m["platform"]),
 	}
 	if p := strVal(m["type"]); p != "" && info.Platform == "" {
@@ -229,7 +239,7 @@ func GetSeason(info *domain.BgmInfo) int {
 	return 1
 }
 
-// GetEps 获取总集数（数据库章节数 total_episodes，回退到已播出集数）。
+// GetEps 获取总集数（数据库章节数 total_episodes，回退到 wiki 话数）。
 func (b *BGM) GetEps(ctx context.Context, info *domain.BgmInfo) int {
 	if info == nil {
 		return 0
@@ -240,30 +250,38 @@ func (b *BGM) GetEps(ctx context.Context, info *domain.BgmInfo) int {
 	return info.Eps
 }
 
-// GetAiredEps 获取已播出集数。
-// 优先：统计剧集列表中 airdate <= 今天 的集数（反映真实播出进度）。
-// 回退：wiki 的 eps。
-func (b *BGM) GetAiredEps(ctx context.Context, info *domain.BgmInfo) int {
+// GetAiredEps 仅统计 Bangumi 正篇分集中播出日期不晚于今天的条目。
+// eps 是 wiki 话数、total_episodes 是全部章节数，都不能作为已播出集数回退。
+func (b *BGM) GetAiredEps(ctx context.Context, info *domain.BgmInfo) (int, error) {
 	if info == nil {
-		return 0
+		return 0, errors.New("Bangumi 条目为空")
 	}
-	if eps, err := b.GetEpisodes(ctx, info.ID); err == nil && len(eps) > 0 {
-		today := domain.Now()
-		count := 0
-		for _, e := range eps {
-			t := e.AirDate.Time()
-			if t.IsZero() {
-				continue
-			}
-			if !t.After(today) {
-				count++
-			}
-		}
-		if count > 0 {
-			return count
-		}
+	eps, err := b.GetEpisodes(ctx, info.ID)
+	if err != nil {
+		return 0, err
 	}
-	return info.Eps
+	return countAiredEpisodes(eps, domain.Now())
+}
+
+func countAiredEpisodes(eps []*domain.BgmEpisode, now time.Time) (int, error) {
+	today := now.In(domain.Loc()).Format("2006-01-02")
+	count, scheduled := 0, false
+	seen := map[int]bool{}
+	for _, e := range eps {
+		if e == nil || e.Type != 0 || e.AirDate.Time().IsZero() {
+			continue
+		}
+		scheduled = true
+		if e.AirDate.Time().In(domain.Loc()).Format("2006-01-02") > today || e.ID > 0 && seen[e.ID] {
+			continue
+		}
+		seen[e.ID] = true
+		count++
+	}
+	if !scheduled {
+		return 0, errors.New("Bangumi 暂无可用的正篇播出日期")
+	}
+	return count, nil
 }
 
 // GetFinalName 返回显示标题（优先中文名，BgmJpName 时用日文名）。
