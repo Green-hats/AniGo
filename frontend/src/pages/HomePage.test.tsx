@@ -13,7 +13,7 @@ vi.mock('../api/client', () => ({ api: {
 } }))
 
 const ani = { id: 'one', title: '测试番剧', enable: true, season: 1, score: 0, downloadedEps: 0, currentEpisodeNumber: 5, totalEpisodeNumber: 12 } as Ani
-const list = (completed = 0): ListAniData => ({ total: 1, releaseDateList: [], weekList: [{ weekLabel: '星期一', items: [{ ...ani, downloadedEps: completed }] }] })
+const list = (completed = 0): ListAniData => ({ total: 1, archivedList: [], releaseDateList: [], weekList: [{ weekLabel: '星期一', items: [{ ...ani, downloadedEps: completed }] }] })
 
 function mount() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })

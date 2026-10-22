@@ -14,12 +14,15 @@ import {
   Empty,
   Skeleton,
   Alert,
+  Tabs,
 } from 'antd'
 import {
   DeleteOutlined,
   SyncOutlined,
   PlayCircleOutlined,
   PlaySquareOutlined,
+  InboxOutlined,
+  RollbackOutlined,
 } from '@ant-design/icons'
 import { api } from '../api/client'
 import type { Ani, PlayItem } from '../types'
@@ -49,6 +52,27 @@ export default function HomePage() {
   const [playAni, setPlayAni] = useState<Ani | null>(null)
   const [playItems, setPlayItems] = useState<PlayItem[] | null>(null)
   const [playLoading, setPlayLoading] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
+  const [archiving, setArchiving] = useState<string | null>(null)
+  const archivedList = data?.archivedList ?? []
+  const activeCount = (data?.total ?? 0) - archivedList.length
+  const visibleWeeks = showArchived
+    ? [{ weekLabel: '已归档', items: archivedList }]
+    : data?.weekList ?? []
+  const visibleCount = showArchived ? archivedList.length : activeCount
+
+  const handleArchive = async (ani: Ani) => {
+    setArchiving(ani.id)
+    try {
+      await api.archiveAni(ani.id, !ani.archived)
+      await refetch()
+      message.success(ani.archived ? '已恢复订阅' : '已归档，已停止自动追更')
+    } catch (e) {
+      message.error((e as Error).message)
+    } finally {
+      setArchiving(null)
+    }
+  }
 
   const handleDelete = async (id: string) => {
     try {
@@ -119,25 +143,34 @@ export default function HomePage() {
         <Typography.Title level={4} style={{ margin: 0 }}>
           我的订阅 ({data?.total ?? 0})
         </Typography.Title>
-        <Button icon={<SyncOutlined />} onClick={handleRefreshAll} loading={refreshAllPending || active()}>
+        {!showArchived && <Button icon={<SyncOutlined />} onClick={handleRefreshAll} loading={refreshAllPending || active()} disabled={activeCount === 0}>
           刷新全部
-        </Button>
+        </Button>}
       </div>
 
       {error && <Alert type="error" title="订阅加载失败" description={error.message} action={<Button onClick={() => refetch()}>重试</Button>} />}
       {isPending && <Skeleton active />}
-      {data?.total === 0 && <Empty description="还没有订阅，去番剧源添加吧" />}
-      {!data ? null : (
+      <Tabs
+        activeKey={showArchived ? 'archived' : 'active'}
+        onChange={(key) => setShowArchived(key === 'archived')}
+        items={[
+          { key: 'active', label: `订阅中 (${activeCount})` },
+          { key: 'archived', label: `已归档 (${archivedList.length})` },
+        ]}
+      />
+      {data && visibleCount === 0 && <Empty description={showArchived ? '暂无归档订阅' : '暂无订阅'} />}
+      {!data || visibleCount === 0 ? null : (
       <Collapse
-        defaultActiveKey={data.weekList.map((_, i) => String(i))}
-        items={data.weekList.map((week, i) => ({
+        key={showArchived ? 'archived' : 'active'}
+        defaultActiveKey={visibleWeeks.map((_, i) => String(i))}
+        items={visibleWeeks.map((week, i) => ({
           key: String(i),
           label: `${week.weekLabel} (${week.items.length})`,
           children: (
             <Space orientation="vertical" style={{ width: '100%' }} size="small">
               {week.items.length === 0 && <Text type="secondary">暂无订阅</Text>}
               {week.items.map((ani) => (
-                <Card key={ani.id} size="small" styles={{ body: { padding: 12 } }}>
+                <Card key={ani.id} role="article" aria-label={ani.title} size="small" styles={{ body: { padding: 12 } }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     {ani.image ? (
                       <img src={ani.image} alt="" style={{ width: 40, height: 56, objectFit: 'cover', borderRadius: 4 }} />
@@ -148,8 +181,8 @@ export default function HomePage() {
                       <div>
                         <Text strong>{ani.title}</Text>
                         {ani.season > 1 && <Tag style={{ marginLeft: 8 }}>第{ani.season}季</Tag>}
-                        <Tag color={ani.enable ? 'green' : 'default'} style={{ marginLeft: 4 }}>
-                          {ani.enable ? '启用' : '停用'}
+                        <Tag color={ani.archived ? 'default' : ani.enable ? 'green' : 'default'} style={{ marginLeft: 4 }}>
+                          {ani.archived ? '已归档' : ani.enable ? '启用' : '停用'}
                         </Tag>
                         {ani.score > 0 && <Tag color="gold">{ani.score.toFixed(1)}</Tag>}
                       </div>
@@ -163,18 +196,26 @@ export default function HomePage() {
                     </div>
                     <Space>
                       <Tooltip title="播放">
-                        <Button size="small" icon={<PlayCircleOutlined />} onClick={() => handlePlay(ani)} />
+                        <Button size="small" aria-label="播放" icon={<PlayCircleOutlined />} onClick={() => handlePlay(ani)} />
                       </Tooltip>
-                      <Tooltip title={ani.enable ? '停用' : '启用'}>
+                      {!ani.archived && <Tooltip title={ani.enable ? '停用' : '启用'}>
                         <Button size="small" onClick={() => handleToggle(ani)}>
                           {ani.enable ? '停用' : '启用'}
                         </Button>
-                      </Tooltip>
-                      <Tooltip title="刷新">
-                        <Button size="small" icon={<SyncOutlined />} disabled={!ani.enable} loading={refreshing === ani.id || active(ani.id)} onClick={() => handleRefresh(ani.id)} />
-                      </Tooltip>
+                      </Tooltip>}
+                      {!ani.archived && <Tooltip title="刷新">
+                        <Button size="small" aria-label="刷新" icon={<SyncOutlined />} disabled={!ani.enable} loading={refreshing === ani.id || active(ani.id)} onClick={() => handleRefresh(ani.id)} />
+                      </Tooltip>}
+                      <Button
+                        size="small"
+                        icon={ani.archived ? <RollbackOutlined /> : <InboxOutlined />}
+                        loading={archiving === ani.id}
+                        onClick={() => handleArchive(ani)}
+                      >
+                        {ani.archived ? '恢复订阅' : '归档'}
+                      </Button>
                       <Popconfirm title="删除该订阅？" onConfirm={() => handleDelete(ani.id)}>
-                        <Button size="small" danger icon={<DeleteOutlined />} />
+                        <Button size="small" aria-label="删除订阅" danger icon={<DeleteOutlined />} />
                       </Popconfirm>
                     </Space>
                   </div>

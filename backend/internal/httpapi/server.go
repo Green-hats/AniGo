@@ -90,6 +90,7 @@ func (s *Server) register() {
 	r.POST("/api/setAni", s.handleSetAni)
 	r.POST("/api/deleteAni", s.handleDeleteAni)
 	r.POST("/api/batchEnable", s.handleBatchEnable)
+	r.POST("/api/archiveAni", s.handleArchiveAni)
 	r.POST("/api/refreshAni", s.handleRefreshAni)
 	r.POST("/api/previewAni", s.handlePreviewAni)
 	r.POST("/api/downloadPath", s.handleDownloadPath)

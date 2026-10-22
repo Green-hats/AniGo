@@ -49,7 +49,7 @@ func NewDownloadService(cfg *ConfigService, rss *RssService, cloud CloudProvider
 	s := &DownloadService{gate: make(chan struct{}, 1), cfg: cfg, rss: rss, cloud: cloud, cache: cache, meta: meta, notify: notify, logger: logger, playCache: map[string]*playCacheEntry{}}
 	s.queue = NewRefreshQueue(128, func(ctx context.Context, id string) error {
 		ani := s.findAni(id)
-		if ani == nil || !ani.Enable {
+		if ani == nil || !ani.Enable || ani.Archived {
 			return fmt.Errorf("订阅已删除或停用")
 		}
 		return s.DownloadAni(ctx, ani)

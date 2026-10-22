@@ -175,8 +175,8 @@ type FansubSource interface {
 - 开放 API（`https://api.animes.garden`）：
   - `GET /feed.xml` — 自定义 RSS 订阅（`?subject=&fansub=&filter=`），标题规整自带 `SxxExx`，guid 带 infohash
   - `GET /resources` — 资源搜索（include/exclude/keywords/fansub/type 过滤）
-  - `GET /subjects` — 番剧周列表（首页番剧源浏览）
   - `GET /detail/{provider}/{id}` — 资源详情
+- 季度周历使用源站相同的 `https://bgm.animes.garden/calendar?season=YYYY-MM`，按上海时区自动选择 1/4/7/10 月季度，保留星期和 WEB 分组；不使用跨季度的 `/subjects` 索引
 - 已实现：`provider/garden` 提供 `ListSubjects` / `Group` / `GetSubjectIdFromURL`
 - ~~备选源 Mikan / ani-bt~~（未实现）
 

@@ -103,6 +103,8 @@ export const api = {
   deleteAni: (ids: string[]) => request<null>('POST', '/api/deleteAni', ids),
   batchEnable: (ids: string[], value: boolean) =>
     request<null>('POST', `/api/batchEnable?value=${value}`, ids),
+  archiveAni: (id: string, archived: boolean) =>
+    request<null>('POST', '/api/archiveAni', { id, archived }),
   previewAni: (ani: Partial<import('../types').Ani>) =>
     request<import('../types').PreviewAniData>('POST', '/api/previewAni', ani),
   downloadPath: (ani: Partial<import('../types').Ani>) =>

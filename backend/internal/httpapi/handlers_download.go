@@ -98,6 +98,10 @@ func (s *Server) handleRefreshAni(c *gin.Context) {
 		fail(c, "订阅不存在")
 		return
 	}
+	if ani.Archived {
+		fail(c, "订阅已归档，请先恢复订阅")
+		return
+	}
 	if !ani.Enable {
 		fail(c, "订阅已停用")
 		return

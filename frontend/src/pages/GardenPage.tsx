@@ -24,6 +24,7 @@ export default function GardenPage() {
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null)
   const [subscribing, setSubscribing] = useState(false)
   const { data: weeks, isPending, error, refetch } = useQuery({ queryKey: ['gardenList'], queryFn: api.gardenList })
+  const season = weeks?.[0]?.season
   const { data: groups, isLoading: groupsLoading, error: groupsError } = useQuery({
     queryKey: ['gardenGroup', selected],
     queryFn: () => api.gardenGroup(selected!),
@@ -55,6 +56,14 @@ export default function GardenPage() {
       <Typography.Title level={4} style={{ marginBottom: 16 }}>
         番剧源
       </Typography.Title>
+      {season && (
+        <Typography.Paragraph type="secondary">
+          {season.replace('-', ' 年 ')} 月新番 ·{' '}
+          <Typography.Link href={`https://animes.garden/calendar/${season}`} target="_blank" rel="noopener noreferrer">
+            查看源站日历
+          </Typography.Link>
+        </Typography.Paragraph>
+      )}
       {isPending && <Skeleton active />}
       {error && <Alert type="error" title="番剧源加载失败" description={error.message} action={<Button onClick={() => refetch()}>重试</Button>} />}
       {!weeks ? null : (

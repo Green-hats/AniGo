@@ -47,6 +47,8 @@
     <tr><td align="center"><b>AI 解析</b></td><td>DeepSeek 等大模型批量解析标题，提取集数 / 分辨率 / 字幕组 / 选版信号，同步完成规则与简中字幕筛选</td></tr>
     <tr><td align="center"><b>智能选版</b></td><td>同集多版本自动择优（分辨率 > 压制源 > 编码 > 色深 > 字幕嵌入/语言），每集不重复下载</td></tr>
     <tr><td align="center"><b>四源聚合</b></td><td><a href="https://animes.garden">animes.garden</a>（動漫花園 + 蜜柑 + 萌番组 + ANi 聚合）作番剧源</td></tr>
+    <tr><td align="center"><b>季度新番</b></td><td>与源站季度日历同步，自动切换当前季度，保留星期与 WEB 分组</td></tr>
+    <tr><td align="center"><b>订阅归档</b></td><td>手动归档已完结番剧，停止自动追更，保留下载记录与播放，支持恢复订阅</td></tr>
     <tr><td align="center"><b>在线播放</b></td><td>首页直接调用系统播放器（mpv 等）经本地代理播放 115 / PikPak 云端文件，无需下载</td></tr>
     <tr><td align="center"><b>元数据</b></td><td>Bangumi 评分 / 季数 / 总集数、封面下载，后台定时刷新（周期可配）</td></tr>
     <tr><td align="center"><b>通知</b></td><td>Telegram / Bark / ServerChan / WebHook / Shell / 系统日志</td></tr>
@@ -103,7 +105,7 @@ cd frontend && npm audit       # 前端：依赖漏洞扫描
 make e2e                       # 端到端集成测试（需真实外部服务：AI/115/BGM/animes.garden）
 ```
 
-覆盖范围：后端单元测试（store/util/domain/rename/rss/scoring/service/httpapi/provider）、前端测试（API client/App 路由/SideMenu 导航）、E2E（基础 API/配置/AI/元数据/RSS/订阅/115 登录/通知/导出导入）。
+覆盖范围：后端单元测试（store/util/domain/rename/rss/scoring/service/httpapi/provider，含季度日历、归档持久化与后台任务跳过）、前端测试（API client/App 路由/SideMenu 导航/订阅归档与恢复）、E2E（基础 API/配置/AI/元数据/RSS/订阅/115 登录/通知/导出导入）。
 
 ## 使用发布版二进制
 
@@ -124,6 +126,12 @@ Windows 直接运行 `anigo-windows-amd64.exe`（参数相同）。首次启动�
 > 发布版二进制内嵌的默认密钥为空，需在网页「设置」里自行填入所选网盘凭据与 AI Key。
 
 ## 配置指南
+
+### 新番源与订阅归档
+
+- **季度日历**：「番剧源」使用 [Anime Garden 季度日历](https://animes.garden/anime)的名单与星期分组，按上海时区自动选择当前季度（1 / 4 / 7 / 10 月），单独展示 WEB 番剧。页面显示当前季度，并提供源站日历链接。
+- **手动归档**：「我的订阅」分为「订阅中」和「已归档」。点击卡片上的「归档」，该订阅会移入「已归档」，停止 RSS 下载同步和元数据刷新，同时保留下载记录、选集播放与删除入口。在「已归档」中点击「恢复订阅」可移回原列表，保留归档前的启用或停用状态。
+- **状态保存**：归档由用户手动操作，状态随订阅保存，重启和备份恢复后仍然保留；已有订阅默认未归档。
 
 ### 下载路径模板
 

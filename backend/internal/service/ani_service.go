@@ -90,12 +90,17 @@ func (s *AniService) ListAni() *domain.ListAni {
 	}
 
 	releaseDateList := []string{}
+	archivedList := []*domain.Ani{}
 	seenMonth := map[string]bool{}
 	for i, ani := range sorted {
 		if ani == nil {
 			continue
 		}
 		ani.Sort = i
+		if ani.Archived {
+			archivedList = append(archivedList, ani)
+			continue
+		}
 		if !ani.ReleaseDate.Time().IsZero() {
 			month := ani.ReleaseDate.Time().Format("2006-01")
 			if !seenMonth[month] {
@@ -124,6 +129,7 @@ func (s *AniService) ListAni() *domain.ListAni {
 		weekList = append(weekList, domain.WeekAni{WeekLabel: w, Items: weekItems[w]})
 	}
 	return &domain.ListAni{
+		ArchivedList:    archivedList,
 		ReleaseDateList: releaseDateList,
 		WeekList:        weekList,
 		Total:           len(sorted),
@@ -164,7 +170,7 @@ func (s *AniService) AddAni(ani *domain.Ani) error {
 	if err != nil {
 		return err
 	}
-	if s.onAdded != nil && ani.Enable {
+	if s.onAdded != nil && ani.Enable && !ani.Archived {
 		s.onAdded(ani.Clone())
 	}
 	return nil
@@ -289,10 +295,18 @@ func (s *AniService) DeleteAni(ids []string) error {
 func (s *AniService) BatchEnable(ids []string, value bool) error {
 	return s.cfg.UpdateAniList(func(list *[]*domain.Ani) error {
 		for _, a := range *list {
-			if a != nil && containsStr(ids, a.ID) {
+			if a != nil && !a.Archived && containsStr(ids, a.ID) {
 				a.Enable = value
 			}
 		}
+		return nil
+	})
+}
+
+// SetArchived 手动归档或恢复，保留原启停状态与下载记录。
+func (s *AniService) SetArchived(id string, archived bool) error {
+	return s.cfg.UpdateAni(id, func(ani *domain.Ani) error {
+		ani.Archived = archived
 		return nil
 	})
 }

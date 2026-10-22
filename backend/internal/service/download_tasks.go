@@ -17,7 +17,7 @@ func (s *DownloadService) SyncDownload(ctx context.Context, list []*domain.Ani) 
 		if ctx.Err() != nil {
 			return
 		}
-		if ani != nil && ani.Enable {
+		if ani != nil && ani.Enable && !ani.Archived {
 			if err := s.DownloadAni(ctx, ani); err != nil {
 				s.logf("ERROR", "download", "%s: %v", ani.Title, err)
 			}
@@ -35,6 +35,9 @@ func (s *DownloadService) findAni(id string) *domain.Ani {
 }
 
 func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) error {
+	if ani == nil {
+		return ErrAniNotFound
+	}
 	select {
 	case s.gate <- struct{}{}:
 	case <-ctx.Done():
@@ -47,6 +50,9 @@ func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) erro
 	ani = s.findAni(ani.ID)
 	if ani == nil {
 		return ErrAniNotFound
+	}
+	if ani.Archived {
+		return fmt.Errorf("订阅已归档")
 	}
 	if !ani.Enable {
 		return fmt.Errorf("订阅已停用")
@@ -64,7 +70,7 @@ func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) erro
 	if err := s.reconcileTasks(ctx, cfg, driver, ani); err != nil {
 		return err
 	}
-	if latest := s.findAni(ani.ID); latest == nil || !latest.Enable {
+	if latest := s.findAni(ani.ID); latest == nil || !latest.Enable || latest.Archived {
 		return nil
 	}
 	var failures []error
@@ -89,6 +95,9 @@ func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) erro
 	items, err := s.rss.GetItems(ctx, ani)
 	if err != nil {
 		return err
+	}
+	if latest := s.findAni(ani.ID); latest == nil || !latest.Enable || latest.Archived {
+		return nil
 	}
 	s.RssOmit(ani, items)
 	s.RssProcrastinating(ani, items)
@@ -124,7 +133,9 @@ func (s *DownloadService) DownloadAni(ctx context.Context, ani *domain.Ani) erro
 	}
 	currentEpisode := s.rss.CurrentEpisodeNumber(ani, items)
 	err = s.cfg.UpdateAni(ani.ID, func(current *domain.Ani) error {
-		current.CurrentEpisodeNumber = currentEpisode
+		if !current.Archived {
+			current.CurrentEpisodeNumber = currentEpisode
+		}
 		return nil
 	})
 	if err == nil {
@@ -171,7 +182,7 @@ func (s *DownloadService) submitTask(ctx context.Context, cfg *domain.Config, dr
 		return ctx.Err()
 	}
 	latest := s.findAni(ani.ID)
-	if latest == nil || !latest.Enable {
+	if latest == nil || !latest.Enable || latest.Archived {
 		return fmt.Errorf("订阅已删除或停用")
 	}
 	previous := task.State
@@ -257,7 +268,7 @@ func (s *DownloadService) finishSubscription(cfg *domain.Config, id string) erro
 		return nil
 	}
 	latest := s.findAni(id)
-	if latest == nil || !latest.Enable || latest.TotalEpisodeNumber < 1 {
+	if latest == nil || !latest.Enable || latest.Archived || latest.TotalEpisodeNumber < 1 {
 		return nil
 	}
 	complete := func(a *domain.Ani) bool {
@@ -276,7 +287,7 @@ func (s *DownloadService) finishSubscription(cfg *domain.Config, id string) erro
 	}
 	disabled := false
 	err := s.cfg.UpdateAni(id, func(a *domain.Ani) error {
-		if a.Enable && complete(a) {
+		if a.Enable && !a.Archived && complete(a) {
 			a.Enable = false
 			disabled = true
 		}

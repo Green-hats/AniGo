@@ -34,6 +34,7 @@ func (i *Item) Clone() *Item {
 
 // ListAni 是分组的订阅列表响应。
 type ListAni struct {
+	ArchivedList    []*Ani    `json:"archivedList"`
 	ReleaseDateList []string  `json:"releaseDateList"`
 	WeekList        []WeekAni `json:"weekList"`
 	Total           int       `json:"total"`

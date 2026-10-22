@@ -185,9 +185,12 @@ func (s *DownloadService) EnqueueRefresh(ids ...string) error  { return s.queue.
 func (s *DownloadService) EnqueueAll() error {
 	ids := []string{}
 	for _, ani := range s.cfg.AniList() {
-		if ani != nil && ani.Enable {
+		if ani != nil && ani.Enable && !ani.Archived {
 			ids = append(ids, ani.ID)
 		}
+	}
+	if len(ids) == 0 {
+		return nil
 	}
 	return s.queue.Enqueue(ids...)
 }

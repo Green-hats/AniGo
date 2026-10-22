@@ -72,6 +72,7 @@ type GroupRegexItem struct {
 // AnimeGarden 是 animes.garden 周列表。
 type AnimeGarden struct {
 	WeekLabel string               `json:"weekLabel"`
+	Season    string               `json:"season"`
 	Subjects  []AnimeGardenSubject `json:"subjects"`
 }
 

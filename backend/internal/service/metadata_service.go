@@ -147,7 +147,7 @@ func (s *MetadataService) RefreshAll(ctx context.Context, list []*domain.Ani) {
 		if ctx.Err() != nil {
 			return
 		}
-		if ani == nil || !ani.Enable || ani.BgmUrl == "" {
+		if ani == nil || !ani.Enable || ani.Archived || ani.BgmUrl == "" {
 			continue
 		}
 		subjectID := bgm.GetSubjectIdByURL(ani.BgmUrl)
@@ -189,7 +189,7 @@ func (s *MetadataService) RefreshAll(ctx context.Context, list []*domain.Ani) {
 			return
 		}
 		if err := s.cfg.UpdateAni(ani.ID, func(current *domain.Ani) error {
-			if current.BgmUrl != ani.BgmUrl {
+			if current.Archived || current.BgmUrl != ani.BgmUrl {
 				return nil
 			}
 			current.Image, current.Cover, current.Score = ani.Image, ani.Cover, ani.Score

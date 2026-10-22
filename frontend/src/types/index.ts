@@ -157,6 +157,7 @@ export interface Ani {
   url: string
   bgmUrl: string
   enable: boolean
+  archived: boolean
   ova: boolean
   cover: string
   image: string
@@ -193,6 +194,7 @@ export interface WeekAni {
 }
 
 export interface ListAniData {
+  archivedList: Ani[]
   releaseDateList: string[]
   weekList: WeekAni[]
   total: number
@@ -227,6 +229,7 @@ export interface GardenSubject {
 }
 
 export interface GardenWeek {
+  season: string
   weekLabel: string
   subjects: GardenSubject[]
 }

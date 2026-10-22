@@ -46,6 +46,7 @@ type Ani struct {
 	Pinyin                       string         `json:"pinyin"`
 	PinyinInitials               string         `json:"pinyinInitials"`
 	Enable                       bool           `json:"enable"`
+	Archived                     bool           `json:"archived"`
 	CurrentEpisodeNumber         int            `json:"currentEpisodeNumber"`
 	TotalEpisodeNumber           int            `json:"totalEpisodeNumber"`
 	BgmAiredEps                  int            `json:"bgmAiredEps"`

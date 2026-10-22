@@ -63,6 +63,25 @@ func (s *Server) handleBatchEnable(c *gin.Context) {
 	okMsg(c, "修改完成")
 }
 
+func (s *Server) handleArchiveAni(c *gin.Context) {
+	var body struct {
+		ID       string `json:"id" binding:"required"`
+		Archived *bool  `json:"archived" binding:"required"`
+	}
+	if !readJSONOrFail(c, &body) {
+		return
+	}
+	if err := s.ani.SetArchived(body.ID, *body.Archived); err != nil {
+		fail(c, err.Error())
+		return
+	}
+	if *body.Archived {
+		okMsg(c, "已归档")
+	} else {
+		okMsg(c, "已恢复订阅")
+	}
+}
+
 func (s *Server) handlePreviewAni(c *gin.Context) {
 	var body domain.Ani
 	if !readJSONOrFail(c, &body) {
